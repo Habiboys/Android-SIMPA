@@ -6,143 +6,154 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  Platform,
   Image,
-  TextInput
+  TextInput,
 } from 'react-native';
-import { Picker } from 'react-native-web';
+import { Picker } from '@react-native-picker/picker';
+import * as ImagePicker from 'expo-image-picker';
 import axiosInstance from '../utils/axios-config';
 import { APP_STYLES, APP_COLORS, ENDPOINTS } from '../config';
-import { AntDesign, Camera } from '@expo/vector-icons';
 
 const CustomSelect = ({ value, onValueChange, items = [], placeholder }) => {
   return (
-    <select 
-      value={value || ''} 
-      onChange={(e) => onValueChange(e.target.value)}
-      style={styles.webSelect}
-    >
-      <option value="">{placeholder}</option>
-      {Array.isArray(items) && items.map(item => (
-        <option key={item.id} value={item.id}>
-          {item.nama || item.label || item.toString()}
-        </option>
-      ))}
-    </select>
+    <View style={styles.pickerContainer}>
+      <Picker
+        selectedValue={value}
+        onValueChange={onValueChange}
+        style={styles.picker}
+      >
+        <Picker.Item label={placeholder} value="" />
+        {Array.isArray(items) && items.map(item => (
+          <Picker.Item
+            key={item.id}
+            label={item.nama || item.label || item.toString()}
+            value={item.id}
+          />
+        ))}
+      </Picker>
+    </View>
   );
 };
 
-const compressImage = async (file) => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const image = document.createElement('img');
-        image.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = image.width;
-          let height = image.height;
-  
-          // Maksimum dimensi
-          const MAX_WIDTH = 1024;
-          const MAX_HEIGHT = 1024;
-  
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
-          }
-  
-          canvas.width = width;
-          canvas.height = height;
-  
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(image, 0, 0, width, height);
-  
-          // Kompres dengan kualitas 0.7 (70%)
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-          resolve(compressedBase64.split(',')[1]);
-        };
-        image.src = event.target.result;
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-  
-  const PhotoUploader = ({ status, photos, setPhotos }) => {
-    const [key, setKey] = useState(Date.now()); // Add key untuk force re-render input
-    
-    const handleFileUpload = async (e) => {
-      const files = Array.from(e.target.files);
+const PhotoPreview = ({ photos, setPhotos, status }) => {
+  if (!photos || !Array.isArray(photos)) return null;
+
+  return (
+    <View style={styles.photoPreviewContainer}>
+      {photos
+        .filter(p => p.status === status)
+        .map((photo, index) => (
+          <View key={index} style={styles.photoPreviewItem}>
+            <Image
+              source={{ uri: `data:image/jpeg;base64,${photo.foto}` }}
+              style={styles.photoThumbnail}
+            />
+            <TouchableOpacity
+              style={styles.deletePhotoButton}
+              onPress={() => {
+                setPhotos(prev => prev.filter((p, i) => 
+                  !(p.status === status && i === index)
+                ));
+              }}
+            >
+              <Text style={styles.deleteButtonText}>×</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+    </View>
+  );
+};
+
+const PhotoUploader = ({ status, photos, setPhotos }) => {
+  useEffect(() => {
+    (async () => {
+      // Request permissions for both camera and media library
+      const [cameraStatus, mediaStatus] = await Promise.all([
+        ImagePicker.requestCameraPermissionsAsync(),
+        ImagePicker.requestMediaLibraryPermissionsAsync()
+      ]);
       
-      for (const file of files) {
-        try {
-          const compressedBase64 = await compressImage(file);
-          setPhotos(prev => [...prev, {
-            foto: compressedBase64,
-            status: status,
-            filename: file.name
-          }]);
-        } catch (error) {
-          console.error('Error compressing image:', error);
-          Alert.alert('Error', 'Gagal memproses foto');
+      if (cameraStatus.status !== 'granted' || mediaStatus.status !== 'granted') {
+        Alert.alert('Permission Denied', 'Izin akses kamera dan galeri diperlukan');
+      }
+    })();
+  }, []);
+
+  const takePhoto = async () => {
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets?.[0]?.base64) {
+        setPhotos(prev => [...prev, {
+          foto: result.assets[0].base64,
+          status: status,
+          filename: 'camera_photo.jpg'
+        }]);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      Alert.alert('Error', 'Gagal mengambil foto');
+    }
+  };
+
+  const pickFromGallery = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets?.[0]?.base64) {
+        setPhotos(prev => [...prev, {
+          foto: result.assets[0].base64,
+          status: status,
+          filename: 'gallery_photo.jpg'
+        }]);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Gagal memilih foto');
+    }
+  };
+
+  const showImageSourceOptions = () => {
+    Alert.alert(
+      'Pilih Sumber Foto',
+      'Pilih foto dari:',
+      [
+        {
+          text: 'Kamera',
+          onPress: takePhoto
+        },
+        {
+          text: 'Galeri',
+          onPress: pickFromGallery
+        },
+        {
+          text: 'Batal',
+          style: 'cancel'
         }
-      }
-    };
-  
-    // useEffect untuk reset input file ketika photos berubah menjadi kosong
-    useEffect(() => {
-      if (photos.length === 0) {
-        setKey(Date.now()); // Generate key baru untuk force re-render input
-      }
-    }, [photos]);
-  
-    return (
-      <View style={styles.photoUploaderContainer}>
-        <View style={styles.photoInputContainer}>
-          <input
-            key={key} // Gunakan key untuk force re-render input
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={handleFileUpload}
-            style={styles.fileInput}
-          />
-        </View>
-        
-        <View style={styles.photoPreviewContainer}>
-          {photos
-            .filter(p => p.status === status)
-            .map((photo, index) => (
-              <View key={index} style={styles.photoPreviewItem}>
-                <Image
-                  source={{ uri: `data:image/jpeg;base64,${photo.foto}` }}
-                  style={styles.photoThumbnail}
-                />
-                <TouchableOpacity
-                  style={styles.deletePhotoButton}
-                  onPress={() => {
-                    setPhotos(prev => prev.filter((p, i) => 
-                      !(p.status === status && i === index)
-                    ));
-                  }}
-                >
-                  <Text style={styles.deleteButtonText}>×</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-        </View>
-      </View>
+      ],
+      { cancelable: true }
     );
   };
 
-export default function FormScreen({ navigation }) {
-  // State untuk form bertingkat
+  return (
+    <View style={styles.photoUploaderContainer}>
+      <TouchableOpacity onPress={showImageSourceOptions} style={styles.pickImageButton}>
+        <Text style={styles.pickImageButtonText}>Tambah Foto</Text>
+      </TouchableOpacity>
+      <PhotoPreview photos={photos} setPhotos={setPhotos} status={status} />
+    </View>
+  );
+};
+
+const FormScreen = ({ navigation }) => {
   const [proyek, setProyek] = useState(null);
   const [proyekList, setProyekList] = useState([]);
   const [gedung, setGedung] = useState(null);
@@ -152,34 +163,42 @@ export default function FormScreen({ navigation }) {
   const [unit, setUnit] = useState(null);
   const [unitList, setUnitList] = useState([]);
   
-  // State untuk pemeriksaan dan pembersihan
   const [variabelPemeriksaan, setVariabelPemeriksaan] = useState([]);
   const [hasilPemeriksaan, setHasilPemeriksaan] = useState([]);
   const [variabelPembersihan, setVariabelPembersihan] = useState([]);
   const [hasilPembersihan, setHasilPembersihan] = useState([]);
   const [loading, setLoading] = useState(false);
-  
-  // State untuk foto
   const [photos, setPhotos] = useState([]);
 
   useEffect(() => {
     loadProyek();
   }, []);
 
-  // Load data untuk dropdowns
   const loadProyek = async () => {
-    console.log('Attempting to load proyek...');
     try {
+      setLoading(true);
       const response = await axiosInstance.get('/proyek');
-      console.log('Proyek response:', response.data);
-      setProyekList(response.data);
+      setProyekList(response.data || []);
     } catch (error) {
-      console.error('Error loading proyek:', error.response?.data || error.message);
+      console.error('Error loading proyek:', error);
       if (error.response?.status === 401) {
         navigation.replace('Login');
       } else {
-        Alert.alert('Error', `Gagal memuat data proyek: ${error.message}`);
+        Alert.alert('Error', 'Gagal memuat data proyek');
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadGedung = async (proyekId) => {
+    try {
+      const selectedProyek = proyekList.find(p => p.id === parseInt(proyekId));
+      if (selectedProyek) {
+        setGedungList(selectedProyek.gedung || []);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Gagal memuat data gedung');
     }
   };
 
@@ -188,10 +207,8 @@ export default function FormScreen({ navigation }) {
       const response = await axiosInstance.get(
         `${ENDPOINTS.PROYEK}/${proyekId}/gedung/${gedungId}/ruangan`
       );
-      console.log('Ruangan response:', response.data);
-      setRuanganList(response.data);
+      setRuanganList(response.data || []);
     } catch (error) {
-      console.error('Error loading ruangan:', error);
       Alert.alert('Error', 'Gagal memuat data ruangan');
     }
   };
@@ -199,10 +216,8 @@ export default function FormScreen({ navigation }) {
   const loadUnit = async (ruanganId) => {
     try {
       const response = await axiosInstance.get(`${ENDPOINTS.UNIT}/ruangan/${ruanganId}`);
-      console.log('Unit response:', response.data);
-      setUnitList(response.data);
+      setUnitList(response.data || []);
     } catch (error) {
-      console.error('Error loading unit:', error);
       Alert.alert('Error', 'Gagal memuat data unit');
     }
   };
@@ -210,143 +225,113 @@ export default function FormScreen({ navigation }) {
   const loadVariabelPemeriksaan = async (kategori) => {
     try {
       setLoading(true);
-      console.log('Loading variables for kategori:', kategori);
-      
-      // Load variabel pemeriksaan
-      const responsePemeriksaan = await axiosInstance.get(
-        `${ENDPOINTS.VARIABLE_PEMERIKSAAN}/kategori/${kategori}`
-      );
-      console.log('Pemeriksaan response:', responsePemeriksaan.data);
-      setVariabelPemeriksaan(responsePemeriksaan.data);
-      // Set default nilai 'Normal' untuk semua hasil pemeriksaan
+      const [responsePemeriksaan, responsePembersihan] = await Promise.all([
+        axiosInstance.get(`${ENDPOINTS.VARIABLE_PEMERIKSAAN}/kategori/${kategori}`),
+        axiosInstance.get(`${ENDPOINTS.VARIABLE_PEMBERSIHAN}/kategori/${kategori}`)
+      ]);
+
+      setVariabelPemeriksaan(responsePemeriksaan.data || []);
       setHasilPemeriksaan(
         responsePemeriksaan.data.map(v => ({
           id_variable_pemeriksaan: v.id,
-          nilai: 'Normal' // Default value
-        }))
+          nilai: 'Normal'
+        })) || []
       );
 
-      // Load variabel pembersihan
-      const responsePembersihan = await axiosInstance.get(
-        `${ENDPOINTS.VARIABLE_PEMBERSIHAN}/kategori/${kategori}`
-      );
-      console.log('Pembersihan response:', responsePembersihan.data);
-      setVariabelPembersihan(responsePembersihan.data);
+      setVariabelPembersihan(responsePembersihan.data || []);
       setHasilPembersihan(
         responsePembersihan.data.map(v => ({
           id_variable_pembersihan: v.id,
           sebelum: '',
           sesudah: ''
-        }))
+        })) || []
       );
     } catch (error) {
-      console.error('Error loading variables:', error);
       Alert.alert('Error', 'Gagal memuat variabel pemeriksaan dan pembersihan');
     } finally {
       setLoading(false);
     }
   };
 
-  const validatePembersihan = (nilai) => {
-    const num = parseFloat(nilai);
-    return !isNaN(num);  // Hanya validasi bahwa input adalah angka desimal
-  };
-
   const resetForm = () => {
-    // Reset unit AC
     setUnit(null);
     setUnitList([]);
-    
-    // Reset pemeriksaan
     setVariabelPemeriksaan([]);
     setHasilPemeriksaan([]);
-    
-    // Reset pembersihan
     setVariabelPembersihan([]);
     setHasilPembersihan([]);
-    
-    // Reset foto
     setPhotos([]);
-    
-    // Reset loading state
-    setLoading(false);
   };
-  
+
   const handleSubmit = async () => {
     try {
-      // Validasi dasar
       if (!unit || hasilPemeriksaan.length === 0 || photos.length < 2) {
         Alert.alert('Error', 'Semua data harus diisi lengkap');
         return;
       }
-  
-      // Validasi hasil pemeriksaan
-      const emptyPemeriksaan = hasilPemeriksaan.some(hp => !hp.nilai);
-      if (emptyPemeriksaan) {
+
+      if (hasilPemeriksaan.some(hp => !hp.nilai)) {
         Alert.alert('Error', 'Semua hasil pemeriksaan harus diisi');
         return;
       }
-  
-      // Validasi hasil pembersihan
-      for (const hp of hasilPembersihan) {
-        if (!validatePembersihan(hp.sebelum) || !validatePembersihan(hp.sesudah)) {
-          Alert.alert('Error', 'Nilai pembersihan harus berupa angka');
-          return;
-        }
+
+      if (hasilPembersihan.some(hp => !hp.sebelum || !hp.sesudah)) {
+        Alert.alert('Error', 'Semua hasil pembersihan harus diisi');
+        return;
       }
-  
-      // Format hasil pembersihan untuk memastikan nilai adalah float
-      const formattedHasilPembersihan = hasilPembersihan.map(hp => ({
-        id_variable_pembersihan: hp.id_variable_pembersihan,
-        sebelum: parseFloat(hp.sebelum),
-        sesudah: parseFloat(hp.sesudah)
-      }));
-  
-      // Format foto sesuai yang diharapkan
-      const formattedPhotos = photos.map(p => ({
-        foto: p.foto,
-        status: p.status
-      }));
-  
+
       const selectedUnit = unitList.find(u => u.id === parseInt(unit));
-  
+      
       const payload = {
         id_unit: parseInt(unit),
         tanggal: new Date().toISOString().split('T')[0],
         nama_pemeriksaan: 'Pemeriksaan Rutin',
         kategori: selectedUnit?.kategori || 'indoor',
         hasil_pemeriksaan: hasilPemeriksaan,
-        hasil_pembersihan: formattedHasilPembersihan,
-        foto: formattedPhotos
+        hasil_pembersihan: hasilPembersihan.map(hp => ({
+          ...hp,
+          sebelum: parseFloat(hp.sebelum),
+          sesudah: parseFloat(hp.sesudah)
+        })),
+        foto: photos.map(p => ({
+          foto: p.foto,
+          status: p.status
+        }))
       };
-  
-      const response = await axiosInstance.post(ENDPOINTS.MAINTENANCE, payload);
-      console.log('Response:', response.data);
-  
-      // Reset form setelah berhasil submit
-      resetForm();
+
+      setLoading(true);
+      await axiosInstance.post(ENDPOINTS.MAINTENANCE, payload);
       
       Alert.alert('Sukses', 'Data berhasil disimpan', [
         { 
           text: 'OK',
           onPress: () => {
-            // Load ulang data unit untuk form baru
+            resetForm();
             if (ruangan) {
-              loadUnit(proyek);
+              loadUnit(ruangan);
             }
           }
         }
       ]);
     } catch (error) {
-      console.error('Submit error:', error.response?.data || error.message);
-      Alert.alert('Error', 'Gagal menyimpan data: ' + (error.response?.data?.message || error.message));
+      Alert.alert('Error', 'Gagal menyimpan data');
+    } finally {
+      setLoading(false);
     }
   };
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollView}>
-        {/* Form selection */}
+        {/* Location Selection */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Pilih Lokasi</Text>
           
@@ -355,12 +340,8 @@ export default function FormScreen({ navigation }) {
             <CustomSelect 
               value={proyek}
               onValueChange={(value) => {
-                console.log('Selected proyek:', value);
-                const selectedProyek = proyekList.find(p => p.id === parseInt(value));
                 setProyek(value);
-                if (selectedProyek) {
-                  setGedungList(selectedProyek.gedung || []);
-                }
+                loadGedung(value);
                 setGedung(null);
                 setRuangan(null);
               }}
@@ -375,7 +356,6 @@ export default function FormScreen({ navigation }) {
               <CustomSelect
                 value={gedung}
                 onValueChange={(value) => {
-                  console.log('Selected gedung:', value);
                   setGedung(value);
                   loadRuangan(proyek, parseInt(value));
                   setRuangan(null);
@@ -386,23 +366,20 @@ export default function FormScreen({ navigation }) {
             </View>
           )}
 
-{gedung && (
-    <View style={styles.inputContainer}>
-      <Text style={styles.label}>Ruangan</Text>
-      <CustomSelect
-        value={ruangan}
-        onValueChange={(value) => {
-          console.log('Selected ruangan:', value);
-          setRuangan(value);
-          if (value) {
-            loadUnit(value); // Pass ruanganId directly
-          }
-        }}
-        items={ruanganList}
-        placeholder="Pilih Ruangan"
-      />
-    </View>
-  )}
+          {gedung && (
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Ruangan</Text>
+              <CustomSelect
+                value={ruangan}
+                onValueChange={(value) => {
+                  setRuangan(value);
+                  loadUnit(value);
+                }}
+                items={ruanganList}
+                placeholder="Pilih Ruangan"
+              />
+            </View>
+          )}
 
           {ruangan && (
             <View style={styles.inputContainer}>
@@ -410,10 +387,8 @@ export default function FormScreen({ navigation }) {
               <CustomSelect
                 value={unit}
                 onValueChange={(value) => {
-                  console.log('Selected unit:', value);
                   setUnit(value);
                   const selectedUnit = unitList.find(u => u.id === parseInt(value));
-                  console.log('Selected unit data:', selectedUnit);
                   if (selectedUnit?.kategori) {
                     loadVariabelPemeriksaan(selectedUnit.kategori);
                   }
@@ -541,56 +516,7 @@ export default function FormScreen({ navigation }) {
       </View>
     </View>
   );
-}
-const photoUploaderStyles = {
-    photoUploaderContainer: {
-      marginTop: 10,
-    },
-    photoInputContainer: {
-      marginBottom: 10,
-    },
-    fileInput: {
-      width: '100%',
-      padding: 10,
-      backgroundColor: '#f8f9fa',
-      borderRadius: 4,
-      borderWidth: 1,
-      borderColor: '#ddd',
-    },
-    photoPreviewContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      marginTop: 10,
-    },
-    photoPreviewItem: {
-      width: '48%',
-      marginRight: '2%',
-      marginBottom: 10,
-      position: 'relative',
-    },
-    photoThumbnail: {
-      width: '100%',
-      height: 150,
-      borderRadius: 8,
-    },
-    deletePhotoButton: {
-      position: 'absolute',
-      top: 5,
-      right: 5,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      borderRadius: 12,
-      width: 24,
-      height: 24,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    deleteButtonText: {
-      color: 'white',
-      fontSize: 18,
-      lineHeight: 24,
-      textAlign: 'center',
-    }
-  };
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -606,12 +532,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 15,
     marginBottom: 20,
-    ...APP_STYLES.card,
+    elevation: 3,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 15,
+    color: APP_COLORS.text,
   },
   inputContainer: {
     marginBottom: 15,
@@ -621,14 +548,16 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     color: '#666',
   },
-  webSelect: {
-    width: '100%',
-    height: 40,
-    borderColor: '#ddd',
+  pickerContainer: {
     borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 4,
-    paddingHorizontal: 10,
     backgroundColor: 'white',
+    overflow: 'hidden',
+  },
+  picker: {
+    height: 40,
+    backgroundColor: 'transparent',
   },
   pemeriksaanItem: {
     marginBottom: 15,
@@ -671,36 +600,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     marginBottom: 8,
+    color: APP_COLORS.text,
   },
   photoUploaderContainer: {
     marginTop: 10,
   },
-  photoInputContainer: {
+  pickImageButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#ddd',
     marginBottom: 10,
   },
-  fileInput: {
-    flex: 1,
-    marginRight: 10,
-    padding: 10,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  cameraButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  cameraButtonText: {
-    marginLeft: 5,
+  pickImageButtonText: {
     color: APP_COLORS.primary,
+    fontSize: 16,
   },
   photoPreviewContainer: {
     flexDirection: 'row',
@@ -708,9 +626,8 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   photoPreviewItem: {
-    width: '48%',
-    marginRight: '2%',
-    marginBottom: 10,
+    width: '45%',
+    margin: '2%',
     position: 'relative',
   },
   photoThumbnail: {
@@ -730,6 +647,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  deleteButtonText: {
+    color: 'white',
+    fontSize: 18,
+    lineHeight: 24,
+    textAlign: 'center',
+  },
   footer: {
     padding: 20,
     backgroundColor: 'white',
@@ -737,20 +660,35 @@ const styles = StyleSheet.create({
     borderTopColor: '#eee',
   },
   submitButton: {
-    ...APP_STYLES.button,
     backgroundColor: APP_COLORS.success,
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
   },
   submitButtonText: {
-    ...APP_STYLES.buttonText,
-  },
-  errorText: {
-    color: APP_COLORS.error,
-    fontSize: 12,
-    marginTop: 5,
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
   loadingText: {
     textAlign: 'center',
     color: '#666',
     padding: 10,
   },
+  pickImageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    backgroundColor: APP_COLORS.primary,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  pickImageButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
+  },
 });
+
+export default FormScreen;

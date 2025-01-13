@@ -10,6 +10,15 @@
       "resizeMode": "contain",
       "backgroundColor": "#FFFFFF"
     },
+    "plugins": [
+      [
+       "expo-image-picker",
+        {
+          "photosPermission": "The app needs access to your photos.",
+          "cameraPermission": "The app needs access to your camera."
+        }
+      ]
+    ],
     "updates": {
       "fallbackToCacheTimeout": 0
     },

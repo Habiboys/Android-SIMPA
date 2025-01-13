@@ -1,8 +1,19 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  StyleSheet, 
+  Alert,
+  ScrollView,
+  SafeAreaView,
+  Dimensions
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_STYLES, APP_COLORS } from '../config';
 import { AntDesign, MaterialIcons } from '@expo/vector-icons';
+
+const windowWidth = Dimensions.get('window').width;
 
 export default function HomeScreen({ navigation }) {
   const handleLogout = () => {
@@ -16,10 +27,7 @@ export default function HomeScreen({ navigation }) {
         },
         {
           text: "Ya, Keluar",
-          onPress: () => {
-            // Langsung jalankan fungsi logoutProcess
-            logoutProcess();
-          }
+          onPress: logoutProcess
         }
       ]
     );
@@ -27,10 +35,8 @@ export default function HomeScreen({ navigation }) {
 
   const logoutProcess = async () => {
     try {
-      // Hapus tokens
       await AsyncStorage.removeItem('accessToken');
       await AsyncStorage.removeItem('refreshToken');
-      // Langsung navigate ke Login
       navigation.reset({
         index: 0,
         routes: [{ name: 'Login' }],
@@ -69,69 +75,92 @@ export default function HomeScreen({ navigation }) {
   ];
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.welcomeText}>Selamat Datang</Text>
-        <Text style={styles.subText}>CV Suralaya SIMPA</Text>
-      </View>
-
-      <View style={styles.menuGrid}>
-        {menuItems.map((item, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.menuItem}
-            onPress={item.onPress}
-          >
-            <View style={[styles.iconContainer, { backgroundColor: item.color }]}>
-              <AntDesign name={item.icon} size={24} color="white" />
-            </View>
-            <Text style={styles.menuText}>{item.title}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <TouchableOpacity 
-        style={styles.logoutButton}
-        onPress={handleLogout}
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <MaterialIcons name="logout" size={20} color={APP_COLORS.error} />
-        <Text style={styles.logoutText}>Logout</Text>
-      </TouchableOpacity>
-    </View>
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <Text style={styles.welcomeText}>Selamat Datang</Text>
+            <Text style={styles.subText}>SIMPA - CV. Suralaya Teknik</Text>
+          </View>
+
+          <View style={styles.menuGrid}>
+            {menuItems.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.menuItem}
+                onPress={item.onPress}
+              >
+                <View style={[styles.iconContainer, { backgroundColor: item.color }]}>
+                  <AntDesign name={item.icon} size={24} color="white" />
+                </View>
+                <Text style={styles.menuText}>{item.title}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+      
+      <View style={styles.footerContainer}>
+        <TouchableOpacity 
+          style={styles.logoutButton}
+          onPress={handleLogout}
+        >
+          <MaterialIcons name="logout" size={20} color={APP_COLORS.error} />
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: APP_COLORS.background,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
   container: {
-    ...APP_STYLES.container,
-    padding: 20,
+    flex: 1,
+    padding: 16, // Mengurangi padding agar lebih seimbang
   },
   header: {
-    marginTop: 20,
-    marginBottom: 40,
+    paddingTop: 20,
+    paddingBottom: 30,
+    alignItems: 'center', // Menengahkan header
   },
   welcomeText: {
     fontSize: 28,
     fontWeight: 'bold',
     color: APP_COLORS.text,
+    textAlign: 'center', // Menengahkan text
   },
   subText: {
     fontSize: 16,
     color: '#666',
     marginTop: 5,
+    textAlign: 'center', // Menengahkan text
   },
   menuGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    padding: 10,
+    paddingHorizontal: 8, // Menambah padding horizontal untuk spacing
+    justifyContent: 'center', // Menengahkan grid
   },
   menuItem: {
-    width: '45%',
+    width: windowWidth < 380 ? '90%' : '43%', // Menyesuaikan lebar
     backgroundColor: 'white',
     borderRadius: 15,
     padding: 15,
-    marginBottom: 20,
+    margin: '3%', // Menggunakan margin persentase yang sama
     alignItems: 'center',
     ...APP_STYLES.card,
   },
@@ -148,6 +177,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     color: APP_COLORS.text,
+    paddingHorizontal: 5,
+  },
+  footerContainer: {
+    padding: 20,
+    paddingBottom: 25, // Menambah padding bottom
+    backgroundColor: APP_COLORS.background,
+    alignItems: 'center', // Menengahkan footer
   },
   logoutButton: {
     flexDirection: 'row',
@@ -158,8 +194,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     borderWidth: 1,
     borderColor: APP_COLORS.error,
-    marginTop: 'auto',
-    marginBottom: 20,
+    width: '90%', // Menyesuaikan lebar button
+    maxWidth: 400, // Maksimum lebar
   },
   logoutText: {
     marginLeft: 10,

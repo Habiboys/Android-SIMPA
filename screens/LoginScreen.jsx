@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   TextInput,
@@ -8,15 +8,40 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ScrollView,
+  Keyboard,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { ENDPOINTS, APP_STYLES, APP_COLORS } from '../config';
-import { AntDesign } from '@expo/vector-icons'; 
+import { AntDesign, Ionicons } from '@expo/vector-icons'; 
 
 export default function LoginScreen({ navigation }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  // Listen to keyboard events
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => {
+        setKeyboardVisible(true);
+      }
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        setKeyboardVisible(false);
+      }
+    );
+
+    return () => {
+      keyboardDidHideListener.remove();
+      keyboardDidShowListener.remove();
+    };
+  }, []);
 
   const handleLogin = async () => {
     try {
@@ -39,44 +64,67 @@ export default function LoginScreen({ navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <View style={styles.logoContainer}>
-        <AntDesign name="API" size={80} color={APP_COLORS.primary} />
-        <Text style={styles.title}>SIMPA</Text>
-        <Text style={styles.subtitle}>Sistem Informasi Manajemen{'\n'}Pemeliharaan AC</Text>
-      </View>
-
-      <View style={styles.formContainer}>
-        <View style={styles.inputContainer}>
-          <AntDesign name="user" size={20} color="#666" style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Username"
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
-          />
-        </View>
-        
-        <View style={styles.inputContainer}>
-          <AntDesign name="lock" size={20} color="#666" style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
+      <ScrollView 
+        contentContainerStyle={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={[
+          styles.logoContainer,
+          keyboardVisible && styles.logoContainerKeyboardVisible
+        ]}>
+          {/* <AntDesign name="API" size={80} color={APP_COLORS.primary} /> */}
+          <Text style={styles.title}>SIMPA</Text>
+          <Text style={styles.subtitle}>Sistem Informasi Manajemen{'\n'}Pemeliharaan AC</Text>
         </View>
 
-        <TouchableOpacity 
-          style={styles.loginButton}
-          onPress={handleLogin}
-        >
-          <Text style={styles.loginButtonText}>Masuk</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.formContainer}>
+          <View style={styles.inputContainer}>
+            <AntDesign name="user" size={20} color="#666" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Username"
+              value={username}
+              onChangeText={setUsername}
+              autoCapitalize="none"
+              returnKeyType="next"
+            />
+          </View>
+          
+          <View style={styles.inputContainer}>
+            <AntDesign name="lock" size={20} color="#666" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              returnKeyType="done"
+            />
+            <TouchableOpacity 
+              style={styles.passwordToggle}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <Ionicons 
+                name={showPassword ? "eye-off" : "eye"} 
+                size={20} 
+                color="#666"
+              />
+            </TouchableOpacity>
+          </View>
 
-      <Text style={styles.footer}>CV Suralaya © 2025</Text>
+          <TouchableOpacity 
+            style={styles.loginButton}
+            onPress={handleLogin}
+          >
+            <Text style={styles.loginButtonText}>Masuk</Text>
+          </TouchableOpacity>
+        </View>
+
+        {!keyboardVisible && (
+          <Text style={styles.footer}>CV. Suralaya Teknik © 2025</Text>
+        )}
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -85,11 +133,19 @@ const styles = StyleSheet.create({
   container: {
     ...APP_STYLES.container,
     justifyContent: 'space-between',
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
     padding: 20,
   },
   logoContainer: {
     alignItems: 'center',
     marginTop: 60,
+  },
+  logoContainerKeyboardVisible: {
+    marginTop: -40, // Ubah ini menjadi nilai negatif untuk menggeser logo lebih ke atas
+    transform: [{ scale: 0.8 }], // Mengecilkan ukuran logo saat keyboard muncul
   },
   title: {
     fontSize: 32,
@@ -106,6 +162,8 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     width: '100%',
+    marginTop: -20, // Tambahkan margin negatif untuk menggeser form ke atas
+    paddingBottom: 40, // Tambah padding bottom agar input tidak tertutup keyboard
   },
   inputContainer: {
     flexDirection: 'row',
@@ -123,6 +181,9 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 50,
     paddingRight: 15,
+  },
+  passwordToggle: {
+    padding: 15,
   },
   loginButton: {
     ...APP_STYLES.button,
