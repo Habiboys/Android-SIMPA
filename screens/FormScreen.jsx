@@ -11,8 +11,10 @@ import {
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
+import { Linking } from 'react-native';
+import * as ImageManipulator from 'expo-image-manipulator';
 import axiosInstance from '../utils/axios-config';
-import { APP_STYLES, APP_COLORS, ENDPOINTS } from '../config';
+import { APP_COLORS, ENDPOINTS } from '../config';
 
 const CustomSelect = ({ value, onValueChange, items = [], placeholder }) => {
   return (
@@ -65,59 +67,142 @@ const PhotoPreview = ({ photos, setPhotos, status }) => {
 };
 
 const PhotoUploader = ({ status, photos, setPhotos }) => {
+  const [hasPermission, setHasPermission] = useState(false);
+
   useEffect(() => {
     (async () => {
-      // Request permissions for both camera and media library
-      const [cameraStatus, mediaStatus] = await Promise.all([
-        ImagePicker.requestCameraPermissionsAsync(),
-        ImagePicker.requestMediaLibraryPermissionsAsync()
-      ]);
-      
-      if (cameraStatus.status !== 'granted' || mediaStatus.status !== 'granted') {
-        Alert.alert('Permission Denied', 'Izin akses kamera dan galeri diperlukan');
+      try {
+        // Check existing permissions first
+        let cameraStatus = await ImagePicker.getCameraPermissionsAsync();
+        let mediaStatus = await ImagePicker.getMediaLibraryPermissionsAsync();
+        
+        // Request permissions if not granted
+        if (!cameraStatus.granted) {
+          cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+        }
+        
+        if (!mediaStatus.granted) {
+          mediaStatus = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        }
+
+        setHasPermission(cameraStatus.granted && mediaStatus.granted);
+        
+        if (!cameraStatus.granted || !mediaStatus.granted) {
+          Alert.alert(
+            'Izin Diperlukan',
+            'Aplikasi membutuhkan izin untuk mengakses kamera dan galeri',
+            [
+              { 
+                text: 'Buka Pengaturan', 
+                onPress: () => Linking.openSettings() 
+              },
+              { 
+                text: 'Batal',
+                style: 'cancel'
+              }
+            ]
+          );
+        }
+      } catch (error) {
+        console.error('Error checking permissions:', error);
+        Alert.alert('Error', 'Gagal memeriksa izin aplikasi');
       }
     })();
   }, []);
 
+  const compressImage = async (base64Image) => {
+    try {
+      const MAX_IMAGE_SIZE = 1024 * 1024; // 1MB
+      if (base64Image.length > MAX_IMAGE_SIZE) {
+        const result = await ImageManipulator.manipulateAsync(
+          `data:image/jpeg;base64,${base64Image}`,
+          [],
+          {
+            compress: 0.5,
+            format: ImageManipulator.SaveFormat.JPEG,
+            base64: true
+          }
+        );
+        return result.base64;
+      }
+      return base64Image;
+    } catch (error) {
+      console.error('Error compressing image:', error);
+      return base64Image;
+    }
+  };
+
   const takePhoto = async () => {
     try {
+      if (!hasPermission) {
+        Alert.alert('Error', 'Izin kamera diperlukan');
+        return;
+      }
+
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, // untuk mengambil gambar
         quality: 0.7,
         base64: true,
+        exif: false
       });
 
       if (!result.canceled && result.assets?.[0]?.base64) {
+        const compressedBase64 = await compressImage(result.assets[0].base64);
+        
         setPhotos(prev => [...prev, {
-          foto: result.assets[0].base64,
+          foto: compressedBase64,
           status: status,
-          filename: 'camera_photo.jpg'
+          filename: `camera_${Date.now()}.jpg`
         }]);
       }
     } catch (error) {
-      console.error('Error taking photo:', error);
-      Alert.alert('Error', 'Gagal mengambil foto');
+      console.error('Camera error:', error);
+      Alert.alert(
+        'Error Kamera',
+        'Gagal mengambil foto. Pastikan izin kamera sudah diberikan.',
+        [
+          { text: 'Buka Pengaturan', onPress: () => Linking.openSettings() },
+          { text: 'OK', style: 'cancel' }
+        ]
+      );
     }
   };
 
   const pickFromGallery = async () => {
     try {
+      if (!hasPermission) {
+        Alert.alert('Error', 'Izin galeri diperlukan');
+        return;
+      }
+
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Gunakan MediaTypeOptions
+        // allowsEditing: true,
+        // aspect: [4, 3],
         quality: 0.7,
         base64: true,
+        exif: false
       });
 
       if (!result.canceled && result.assets?.[0]?.base64) {
+        const compressedBase64 = await compressImage(result.assets[0].base64);
+        
         setPhotos(prev => [...prev, {
-          foto: result.assets[0].base64,
+          foto: compressedBase64,
           status: status,
-          filename: 'gallery_photo.jpg'
+          filename: `gallery_${Date.now()}.jpg`
         }]);
       }
     } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Gagal memilih foto');
+      console.error('Gallery error:', error);
+      Alert.alert(
+        'Error Galeri',
+        'Gagal memilih foto. Pastikan izin galeri sudah diberikan.',
+        [
+          { text: 'Buka Pengaturan', onPress: () => Linking.openSettings() },
+          { text: 'OK', style: 'cancel' }
+        ]
+      );
     }
   };
 
@@ -286,7 +371,7 @@ const FormScreen = ({ navigation }) => {
         id_unit: parseInt(unit),
         tanggal: new Date().toISOString().split('T')[0],
         nama_pemeriksaan: 'Pemeriksaan Rutin',
-        kategori: selectedUnit?.kategori || 'indoor',
+        kategori: selectedUnit?.detailModel.kategori,
         hasil_pemeriksaan: hasilPemeriksaan,
         hasil_pembersihan: hasilPembersihan.map(hp => ({
           ...hp,
@@ -389,14 +474,14 @@ const FormScreen = ({ navigation }) => {
                 onValueChange={(value) => {
                   setUnit(value);
                   const selectedUnit = unitList.find(u => u.id === parseInt(value));
-                  if (selectedUnit?.kategori) {
-                    loadVariabelPemeriksaan(selectedUnit.kategori);
+                  if (selectedUnit?.detailModel.kategori) {
+                    loadVariabelPemeriksaan(selectedUnit.detailModel.kategori);
                   }
                 }}
                 items={unitList.map(unit => ({
                   id: unit.id,
-                  nama: `${unit.nama} - ${unit.detailModel?.nama_model || 'N/A'} - ${unit.nomor_seri} (${unit.kategori})`
-                }))}
+                  nama: `${unit.detailModel?.nama_model || 'N/A'}/${unit.nomor_seri} (${unit.detailModel.kategori}) - ${unit.detailModel.jenisModel.merek.nama} -`
+                }))} 
                 placeholder="Pilih Unit AC"
               />
             </View>
@@ -439,7 +524,7 @@ const FormScreen = ({ navigation }) => {
                 {hasilPembersihan.map((hp, index) => (
                   <View key={index} style={styles.pembersihanItem}>
                     <Text style={styles.label}>
-                      {variabelPembersihan[index]?.nama_variabel}
+                      {variabelPembersihan[index]?.nama_variable}
                     </Text>
                     <View style={styles.pembersihanInputContainer}>
                       <View style={styles.pembersihanInputItem}>
@@ -481,28 +566,38 @@ const FormScreen = ({ navigation }) => {
 
         {/* Photo Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Foto Dokumentasi</Text>
-          
-          <View style={styles.photoSection}>
-            <View style={styles.photoContainer}>
-              <Text style={styles.photoLabel}>Foto Sebelum</Text>
-              <PhotoUploader 
-                status="sebelum"
-                photos={photos}
-                setPhotos={setPhotos}
-              />
-            </View>
+  <Text style={styles.sectionTitle}>Dokumentasi  </Text>
+  <Text style={styles.photoDescription}>
+    Unggah foto Filter, Evaporator, Condensor, dan Drain Pan Condition sebagai dokumentasi sebelum/sesudah pemeliharaan.
+  </Text>
 
-            <View style={styles.photoContainer}>
-              <Text style={styles.photoLabel}>Foto Sesudah</Text>
-              <PhotoUploader 
-                status="sesudah"
-                photos={photos}
-                setPhotos={setPhotos}
-              />
-            </View>
-          </View>
-        </View>
+  <View style={styles.photoSection}>
+    {/* Foto Sebelum */}
+    <View style={styles.photoContainer}>
+      <Text style={styles.photoLabel}>Foto Sebelum Pemeliharaan</Text>
+      {/* <Text style={styles.sublabel}>Dokumentasikan kondisi sebelum pembersihan atau perbaikan.</Text> */}
+      <PhotoUploader 
+        status="sebelum"
+        photos={photos}
+        setPhotos={setPhotos}
+      />
+    </View>
+
+    {/* Divider */}
+    <View style={styles.divider} />
+
+    {/* Foto Sesudah */}
+    <View style={styles.photoContainer}>
+      <Text style={styles.photoLabel}>Foto Sesudah Pemeliharaan</Text>
+      {/* <Text style={styles.sublabel}>Unggah foto setelah proses pembersihan atau perbaikan selesai.</Text> */}
+      <PhotoUploader 
+        status="sesudah"
+        photos={photos}
+        setPhotos={setPhotos}
+      />
+    </View>
+  </View>
+</View>
       </ScrollView>
 
       {/* Submit Button */}
@@ -556,7 +651,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   picker: {
-    height: 40,
+    height: 55,
     backgroundColor: 'transparent',
   },
   pemeriksaanItem: {
@@ -688,6 +783,17 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '500',
+  },
+  photoDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 10,
+    lineHeight: 20,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#ddd',
+    marginVertical: 15,
   },
 });
 
