@@ -36,6 +36,186 @@ const CustomSelect = ({ value, onValueChange, items = [], placeholder }) => {
     </View>
   );
 };
+const SinglePhotoPreview = ({ photo, onDelete }) => {
+  if (!photo) return null;
+
+  return (
+    <View style={styles.singlePhotoPreviewItem}>
+      <Image
+        source={{ uri: `data:image/jpeg;base64,${photo}` }}
+        style={styles.photoThumbnail}
+      />
+      {onDelete && (
+        <TouchableOpacity
+          style={styles.deletePhotoButton}
+          onPress={onDelete}
+        >
+          <Text style={styles.deleteButtonText}>×</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+};
+
+
+const SinglePhotoUploader = ({ status, photo, setPhoto }) => {
+  const [hasPermission, setHasPermission] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        // Check existing permissions first
+        let cameraStatus = await ImagePicker.getCameraPermissionsAsync();
+        let mediaStatus = await ImagePicker.getMediaLibraryPermissionsAsync();
+        
+        // Request permissions if not granted
+        if (!cameraStatus.granted) {
+          cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
+        }
+        
+        if (!mediaStatus.granted) {
+          mediaStatus = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        }
+
+        setHasPermission(cameraStatus.granted && mediaStatus.granted);
+        
+        if (!cameraStatus.granted || !mediaStatus.granted) {
+          Alert.alert(
+            'Izin Diperlukan',
+            'Aplikasi membutuhkan izin untuk mengakses kamera dan galeri',
+            [
+              { 
+                text: 'Buka Pengaturan', 
+                onPress: () => Linking.openSettings() 
+              },
+              { 
+                text: 'Batal',
+                style: 'cancel'
+              }
+            ]
+          );
+        }
+      } catch (error) {
+        console.error('Error checking permissions:', error);
+        Alert.alert('Error', 'Gagal memeriksa izin aplikasi');
+      }
+    })();
+  }, []);
+
+  const compressImage = async (base64Image) => {
+    try {
+      const MAX_IMAGE_SIZE = 1024 * 1024; // 1MB
+      if (base64Image.length > MAX_IMAGE_SIZE) {
+        const result = await ImageManipulator.manipulateAsync(
+          `data:image/jpeg;base64,${base64Image}`,
+          [],
+          {
+            compress: 0.5,
+            format: ImageManipulator.SaveFormat.JPEG,
+            base64: true
+          }
+        );
+        return result.base64;
+      }
+      return base64Image;
+    } catch (error) {
+      console.error('Error compressing image:', error);
+      return base64Image;
+    }
+  };
+
+
+  const takePhoto = async () => {
+    try {
+      if (!hasPermission) {
+        Alert.alert('Error', 'Izin kamera diperlukan');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+        base64: true,
+        exif: false
+      });
+
+      if (!result.canceled && result.assets?.[0]?.base64) {
+        const compressedBase64 = await compressImage(result.assets[0].base64);
+        setPhoto(compressedBase64);
+      }
+    } catch (error) {
+      console.error('Camera error:', error);
+      Alert.alert(
+        'Error Kamera',
+        'Gagal mengambil foto. Pastikan izin kamera sudah diberikan.',
+        [
+          { text: 'Buka Pengaturan', onPress: () => Linking.openSettings() },
+          { text: 'OK', style: 'cancel' }
+        ]
+      );
+    }
+  };
+
+  const pickFromGallery = async () => {
+    try {
+      if (!hasPermission) {
+        Alert.alert('Error', 'Izin galeri diperlukan');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+        base64: true,
+        exif: false
+      });
+
+      if (!result.canceled && result.assets?.[0]?.base64) {
+        const compressedBase64 = await compressImage(result.assets[0].base64);
+        setPhoto(compressedBase64);
+      }
+    } catch (error) {
+      console.error('Gallery error:', error);
+      Alert.alert(
+        'Error Galeri',
+        'Gagal memilih foto. Pastikan izin galeri sudah diberikan.',
+        [
+          { text: 'Buka Pengaturan', onPress: () => Linking.openSettings() },
+          { text: 'OK', style: 'cancel' }
+        ]
+      );
+    }
+  };
+
+  const showImageSourceOptions = () => {
+    Alert.alert(
+      'Pilih Sumber Foto',
+      'Pilih foto dari:',
+      [
+        { text: 'Kamera', onPress: takePhoto },
+        { text: 'Galeri', onPress: pickFromGallery },
+        { text: 'Batal', style: 'cancel' }
+      ],
+      { cancelable: true }
+    );
+  };
+
+  return (
+    <View style={styles.photoUploaderContainer}>
+      <TouchableOpacity onPress={showImageSourceOptions} style={styles.pickImageButton}>
+        <Text style={styles.pickImageButtonText}>
+          {photo ? 'Ganti Foto' : 'Tambah Foto'}
+        </Text>
+      </TouchableOpacity>
+      <SinglePhotoPreview
+        photo={photo}
+        onDelete={() => setPhoto(null)}
+      />
+    </View>
+  );
+};
+
+
 
 const PhotoPreview = ({ photos, setPhotos, status }) => {
   if (!photos || !Array.isArray(photos)) return null;
@@ -254,6 +434,8 @@ const FormScreen = ({ navigation }) => {
   const [hasilPembersihan, setHasilPembersihan] = useState([]);
   const [loading, setLoading] = useState(false);
   const [photos, setPhotos] = useState([]);
+  const [paletIndoorPhoto, setPaletIndoorPhoto] = useState(null);
+  const [paletOutdoorPhoto, setPaletOutdoorPhoto] = useState(null);
 
   useEffect(() => {
     loadProyek();
@@ -346,6 +528,8 @@ const FormScreen = ({ navigation }) => {
     setVariabelPembersihan([]);
     setHasilPembersihan([]);
     setPhotos([]);
+    setPaletIndoorPhoto(null);
+    setPaletOutdoorPhoto(null);
   };
 
   const handleSubmit = async () => {
@@ -362,6 +546,10 @@ const FormScreen = ({ navigation }) => {
 
       if (hasilPembersihan.some(hp => !hp.sebelum || !hp.sesudah)) {
         Alert.alert('Error', 'Semua hasil pembersihan harus diisi');
+        return;
+      }
+      if (!paletIndoorPhoto || !paletOutdoorPhoto) {
+        Alert.alert('Error', 'Foto palet indoor dan outdoor harus diisi');
         return;
       }
 
@@ -381,7 +569,9 @@ const FormScreen = ({ navigation }) => {
         foto: photos.map(p => ({
           foto: p.foto,
           status: p.status
-        }))
+        })),
+        palet_indoor: paletIndoorPhoto,
+        palet_outdoor: paletOutdoorPhoto
       };
 
       setLoading(true);
@@ -480,7 +670,7 @@ const FormScreen = ({ navigation }) => {
                 }}
                 items={unitList.map(unit => ({
                   id: unit.id,
-                  nama: `${unit.detailModel?.nama_model || 'N/A'}/${unit.nomor_seri} (${unit.detailModel.kategori}) - ${unit.detailModel.jenisModel.merek.nama} -`
+                  nama: `${unit.detailModel?.nama_model || 'N/A'}/${unit.nomor_seri} (${unit.detailModel.kategori}) - ${unit.detailModel.jenisModel.merek.nama}`
                 }))} 
                 placeholder="Pilih Unit AC"
               />
@@ -563,6 +753,39 @@ const FormScreen = ({ navigation }) => {
             )}
           </>
         )}
+         {/* Updated Palet Photos Section */}
+         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Foto Palet Unit</Text>
+          
+          {/* Indoor Pallet Photo */}
+          <View style={styles.photoContainer}>
+            <Text style={styles.photoLabel}>Foto Palet Unit Indoor</Text>
+            <Text style={styles.photoDescription}>
+              Upload foto palet unit indoor untuk dokumentasi pemeliharaan.
+            </Text>
+            <SinglePhotoUploader 
+              status="palet_indoor"
+              photo={paletIndoorPhoto}
+              setPhoto={setPaletIndoorPhoto}
+            />
+          </View>
+
+          <View style={styles.divider} />
+
+          {/* Outdoor Pallet Photo */}
+          <View style={styles.photoContainer}>
+            <Text style={styles.photoLabel}>Foto Palet Unit Outdoor</Text>
+            <Text style={styles.photoDescription}>
+              Upload foto palet unit outdoor untuk dokumentasi pemeliharaan.
+            </Text>
+            <SinglePhotoUploader 
+              status="palet_outdoor"
+              photo={paletOutdoorPhoto}
+              setPhoto={setPaletOutdoorPhoto}
+            />
+          </View>
+        </View>
+
 
         {/* Photo Section */}
         <View style={styles.section}>
@@ -794,6 +1017,11 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#ddd',
     marginVertical: 15,
+  },
+  singlePhotoPreviewItem: {
+    width: '100%',
+    position: 'relative',
+    marginTop: 10,
   },
 });
 
