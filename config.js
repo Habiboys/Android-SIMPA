@@ -1,4 +1,5 @@
-export const API_URL = "https://simpa.ftiorganizerhub.tech"; // Ganti dengan IP komputer Anda
+// export const API_URL = "https://backend-593079612074.asia-southeast1.run.app"; // Ganti dengan IP komputer Anda
+export const API_URL = "http://192.168.1.43:3000"; // Ganti dengan IP komputer Anda
 
 export const ENDPOINTS = {
   LOGIN: `${API_URL}/auth/login`,
@@ -8,6 +9,8 @@ export const ENDPOINTS = {
   VARIABLE_PEMERIKSAAN: `${API_URL}/variable-pemeriksaan`,
   VARIABLE_PEMBERSIHAN: `${API_URL}/variable-pembersihan`,
   MAINTENANCE: `${API_URL}/maintenance`,
+  VALIDATE_TOKEN: `${API_URL}/auth/validate`,
+  REFRESH_TOKEN: `${API_URL}/auth/refresh`,
 };
 
 export const APP_COLORS = {

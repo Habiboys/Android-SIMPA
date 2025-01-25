@@ -218,8 +218,6 @@ const SinglePhotoUploader = ({ status, photo, setPhoto }) => {
 
 
 const PhotoPreview = ({ photos, setPhotos, status }) => {
-  if (!photos || !Array.isArray(photos)) return null;
-
   return (
     <View style={styles.photoPreviewContainer}>
       {photos
@@ -230,6 +228,8 @@ const PhotoPreview = ({ photos, setPhotos, status }) => {
               source={{ uri: `data:image/jpeg;base64,${photo.foto}` }}
               style={styles.photoThumbnail}
             />
+            {/* Pastikan teks dibungkus dengan <Text> */}
+            <Text style={styles.photoName}>{photo.nama}</Text>
             <TouchableOpacity
               style={styles.deletePhotoButton}
               onPress={() => {
@@ -248,6 +248,7 @@ const PhotoPreview = ({ photos, setPhotos, status }) => {
 
 const PhotoUploader = ({ status, photos, setPhotos }) => {
   const [hasPermission, setHasPermission] = useState(false);
+  const [photoName, setPhotoName] = useState(''); // State untuk menyimpan nama foto
 
   useEffect(() => {
     (async () => {
@@ -312,6 +313,21 @@ const PhotoUploader = ({ status, photos, setPhotos }) => {
     }
   };
 
+  const handleAddPhoto = async (base64Photo) => {
+    if (!photoName) {
+      Alert.alert('Error', 'Nama foto harus diisi');
+      return;
+    }
+
+    const compressedBase64 = await compressImage(base64Photo);
+    setPhotos(prev => [...prev, {
+      foto: compressedBase64,
+      status: status,
+      nama: photoName, // Sertakan nama foto
+    }]);
+    setPhotoName(''); // Reset input nama foto setelah foto ditambahkan
+  };
+
   const takePhoto = async () => {
     try {
       if (!hasPermission) {
@@ -320,20 +336,14 @@ const PhotoUploader = ({ status, photos, setPhotos }) => {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images, // untuk mengambil gambar
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 0.7,
         base64: true,
         exif: false
       });
 
       if (!result.canceled && result.assets?.[0]?.base64) {
-        const compressedBase64 = await compressImage(result.assets[0].base64);
-        
-        setPhotos(prev => [...prev, {
-          foto: compressedBase64,
-          status: status,
-          filename: `camera_${Date.now()}.jpg`
-        }]);
+        await handleAddPhoto(result.assets[0].base64);
       }
     } catch (error) {
       console.error('Camera error:', error);
@@ -356,22 +366,14 @@ const PhotoUploader = ({ status, photos, setPhotos }) => {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images, // Gunakan MediaTypeOptions
-        // allowsEditing: true,
-        // aspect: [4, 3],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 0.7,
         base64: true,
         exif: false
       });
 
       if (!result.canceled && result.assets?.[0]?.base64) {
-        const compressedBase64 = await compressImage(result.assets[0].base64);
-        
-        setPhotos(prev => [...prev, {
-          foto: compressedBase64,
-          status: status,
-          filename: `gallery_${Date.now()}.jpg`
-        }]);
+        await handleAddPhoto(result.assets[0].base64);
       }
     } catch (error) {
       console.error('Gallery error:', error);
@@ -410,9 +412,20 @@ const PhotoUploader = ({ status, photos, setPhotos }) => {
 
   return (
     <View style={styles.photoUploaderContainer}>
+      {/* Input Nama Foto */}
+      <TextInput
+        style={styles.photoNameInput}
+        placeholder="Masukkan nama foto"
+        value={photoName}
+        onChangeText={setPhotoName}
+      />
+
+      {/* Tombol Unggah Foto */}
       <TouchableOpacity onPress={showImageSourceOptions} style={styles.pickImageButton}>
         <Text style={styles.pickImageButtonText}>Tambah Foto</Text>
       </TouchableOpacity>
+
+      {/* Preview Foto */}
       <PhotoPreview photos={photos} setPhotos={setPhotos} status={status} />
     </View>
   );
@@ -440,6 +453,10 @@ const FormScreen = ({ navigation }) => {
   useEffect(() => {
     loadProyek();
   }, []);
+
+  const selectedUnit = unitList.find(u => u.id === parseInt(unit));
+const isIndoor = selectedUnit?.detailModel.kategori === 'indoor';
+const isOutdoor = selectedUnit?.detailModel.kategori === 'outdoor';
 
   const loadProyek = async () => {
     try {
@@ -548,31 +565,38 @@ const FormScreen = ({ navigation }) => {
         Alert.alert('Error', 'Semua hasil pembersihan harus diisi');
         return;
       }
-      if (!paletIndoorPhoto || !paletOutdoorPhoto) {
-        Alert.alert('Error', 'Foto palet indoor dan outdoor harus diisi');
-        return;
-      }
+     if (isIndoor && !paletIndoorPhoto) {
+  Alert.alert('Error', 'Foto palet indoor harus diisi');
+  return;
+}
 
-      const selectedUnit = unitList.find(u => u.id === parseInt(unit));
+if (isOutdoor && !paletOutdoorPhoto) {
+  Alert.alert('Error', 'Foto palet outdoor harus diisi');
+  return;
+}
+
+      // const selectedUnit = unitList.find(u => u.id === parseInt(unit));
+     
       
       const payload = {
-        id_unit: parseInt(unit),
-        tanggal: new Date().toISOString().split('T')[0],
-        nama_pemeriksaan: 'Pemeriksaan Rutin',
-        kategori: selectedUnit?.detailModel.kategori,
-        hasil_pemeriksaan: hasilPemeriksaan,
-        hasil_pembersihan: hasilPembersihan.map(hp => ({
-          ...hp,
-          sebelum: parseFloat(hp.sebelum),
-          sesudah: parseFloat(hp.sesudah)
-        })),
-        foto: photos.map(p => ({
-          foto: p.foto,
-          status: p.status
-        })),
-        palet_indoor: paletIndoorPhoto,
-        palet_outdoor: paletOutdoorPhoto
-      };
+  id_unit: parseInt(unit),
+  tanggal: new Date().toISOString().split('T')[0],
+  nama_pemeriksaan: 'Pemeriksaan Rutin',
+  kategori: selectedUnit?.detailModel.kategori,
+  hasil_pemeriksaan: hasilPemeriksaan,
+  hasil_pembersihan: hasilPembersihan.map(hp => ({
+    ...hp,
+    sebelum: parseFloat(hp.sebelum),
+    sesudah: parseFloat(hp.sesudah)
+  })),
+  foto: photos.map(p => ({
+    foto: p.foto,
+    status: p.status,
+    nama: p.nama // Pastikan nama foto disertakan
+  })),
+  palet_indoor: isIndoor ? paletIndoorPhoto : null, // Hanya kirim jika indoor
+  palet_outdoor: isOutdoor ? paletOutdoorPhoto : null // Hanya kirim jika outdoor
+};
 
       setLoading(true);
       await axiosInstance.post(ENDPOINTS.MAINTENANCE, payload);
@@ -590,6 +614,8 @@ const FormScreen = ({ navigation }) => {
       ]);
     } catch (error) {
       Alert.alert('Error', 'Gagal menyimpan data');
+      console.error('Full Error:', error.response);
+    Alert.alert('Error', error.response?.data?.message || 'Gagal menyimpan data');
     } finally {
       setLoading(false);
     }
@@ -754,38 +780,39 @@ const FormScreen = ({ navigation }) => {
           </>
         )}
          {/* Updated Palet Photos Section */}
-         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Foto Palet Unit</Text>
-          
-          {/* Indoor Pallet Photo */}
-          <View style={styles.photoContainer}>
-            <Text style={styles.photoLabel}>Foto Palet Unit Indoor</Text>
-            <Text style={styles.photoDescription}>
-              Upload foto palet unit indoor untuk dokumentasi pemeliharaan.
-            </Text>
-            <SinglePhotoUploader 
-              status="palet_indoor"
-              photo={paletIndoorPhoto}
-              setPhoto={setPaletIndoorPhoto}
-            />
-          </View>
+        <View style={styles.section}>
+  <Text style={styles.sectionTitle}>Foto Palet Unit</Text>
+  
+  {/* Indoor Pallet Photo */}
+  {isIndoor && (
+    <View style={styles.photoContainer}>
+      <Text style={styles.photoLabel}>Foto Palet Unit Indoor</Text>
+      <Text style={styles.photoDescription}>
+        Upload foto palet unit indoor untuk dokumentasi pemeliharaan.
+      </Text>
+      <SinglePhotoUploader 
+        status="palet_indoor"
+        photo={paletIndoorPhoto}
+        setPhoto={setPaletIndoorPhoto}
+      />
+    </View>
+  )}
 
-          <View style={styles.divider} />
-
-          {/* Outdoor Pallet Photo */}
-          <View style={styles.photoContainer}>
-            <Text style={styles.photoLabel}>Foto Palet Unit Outdoor</Text>
-            <Text style={styles.photoDescription}>
-              Upload foto palet unit outdoor untuk dokumentasi pemeliharaan.
-            </Text>
-            <SinglePhotoUploader 
-              status="palet_outdoor"
-              photo={paletOutdoorPhoto}
-              setPhoto={setPaletOutdoorPhoto}
-            />
-          </View>
-        </View>
-
+  {/* Outdoor Pallet Photo */}
+  {isOutdoor && (
+    <View style={styles.photoContainer}>
+      <Text style={styles.photoLabel}>Foto Palet Unit Outdoor</Text>
+      <Text style={styles.photoDescription}>
+        Upload foto palet unit outdoor untuk dokumentasi pemeliharaan.
+      </Text>
+      <SinglePhotoUploader 
+        status="palet_outdoor"
+        photo={paletOutdoorPhoto}
+        setPhoto={setPaletOutdoorPhoto}
+      />
+    </View>
+  )}
+</View>
 
         {/* Photo Section */}
         <View style={styles.section}>
@@ -1022,6 +1049,20 @@ const styles = StyleSheet.create({
     width: '100%',
     position: 'relative',
     marginTop: 10,
+  },
+   photoName: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 5,
+    textAlign: 'center',
+  },
+   photoNameInput: {
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 10,
   },
 });
 

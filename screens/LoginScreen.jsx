@@ -43,21 +43,26 @@ export default function LoginScreen({ navigation }) {
     };
   }, []);
 
-  const handleLogin = async () => {
-    try {
-      const response = await axios.post(ENDPOINTS.LOGIN, { username, password });
-
-      if (response.data?.accessToken && response.data?.refreshToken) {
-        await AsyncStorage.setItem('accessToken', response.data.accessToken);
-        await AsyncStorage.setItem('refreshToken', response.data.refreshToken);
-        navigation.replace('Home');
-      } else {
-        Alert.alert('Login Gagal', 'Token tidak ditemukan');
+// Di LoginScreen.js
+const handleLogin = async () => {
+  try {
+    const response = await axios.post(ENDPOINTS.LOGIN, { username, password });
+    
+    if (response.data?.success && response.data?.accessToken) {
+      if (response.data.user.role !== 'lapangan') {
+        Alert.alert('Error', 'Anda tidak memiliki akses');
+        return;
       }
-    } catch (error) {
-      Alert.alert('Error', 'Terjadi kesalahan saat login');
+
+      await AsyncStorage.setItem('accessToken', response.data.accessToken);
+      await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
+      
+      navigation.replace('Home');
     }
-  };
+  } catch (error) {
+    Alert.alert('Error', 'Username atau password salah');
+  }
+};
 
   return (
     <KeyboardAvoidingView 
