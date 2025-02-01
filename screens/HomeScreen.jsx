@@ -7,13 +7,16 @@ import {
   Alert,
   ScrollView,
   SafeAreaView,
-  Dimensions
+  Dimensions,
+  StatusBar,
+  Platform
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { APP_STYLES, APP_COLORS } from '../config';
 import { AntDesign, MaterialIcons } from '@expo/vector-icons';
 
 const windowWidth = Dimensions.get('window').width;
+const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight;
 
 export default function HomeScreen({ navigation }) {
   const handleLogout = () => {
@@ -21,14 +24,8 @@ export default function HomeScreen({ navigation }) {
       "Konfirmasi Logout",
       "Apakah Anda yakin ingin keluar?",
       [
-        {
-          text: "Batal",
-          style: "cancel"
-        },
-        {
-          text: "Ya, Keluar",
-          onPress: logoutProcess
-        }
+        { text: "Batal", style: "cancel" },
+        { text: "Ya, Keluar", onPress: logoutProcess }
       ]
     );
   };
@@ -75,35 +72,49 @@ export default function HomeScreen({ navigation }) {
   ];
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.container}>
+      <StatusBar 
+        barStyle="dark-content" 
+        backgroundColor={APP_COLORS.background}
+        translucent={true}
+      />
+      
+      {/* Header Fixed */}
+      <View style={styles.headerFixed}>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>SIMPA</Text>
+          {/*<Text style={styles.headerSubtitle}>CV. Suralaya Teknik</Text>*/}
+        </View>
+      </View>
+
+      {/* Main Content Scrollable */}
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.welcomeText}>Selamat Datang</Text>
-            <Text style={styles.subText}>SIMPA - CV. Suralaya Teknik</Text>
-          </View>
+        <View style={styles.welcomeSection}>
+          <Text style={styles.welcomeText}>Selamat Datang</Text>
+          <Text style={styles.subText}>Sistem Informasi Manajemen Pemeliharaan AC</Text>
+        </View>
 
-          <View style={styles.menuGrid}>
-            {menuItems.map((item, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.menuItem}
-                onPress={item.onPress}
-              >
-                <View style={[styles.iconContainer, { backgroundColor: item.color }]}>
-                  <AntDesign name={item.icon} size={24} color="white" />
-                </View>
-                <Text style={styles.menuText}>{item.title}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+        <View style={styles.menuGrid}>
+          {menuItems.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.menuItem}
+              onPress={item.onPress}
+            >
+              <View style={[styles.iconContainer, { backgroundColor: item.color }]}>
+                <AntDesign name={item.icon} size={24} color="white" />
+              </View>
+              <Text style={styles.menuText}>{item.title}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </ScrollView>
       
+      {/* Footer Fixed */}
       <View style={styles.footerContainer}>
         <TouchableOpacity 
           style={styles.logoutButton}
@@ -113,54 +124,83 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
     backgroundColor: APP_COLORS.background,
+    paddingTop: STATUSBAR_HEIGHT, // Add padding for status bar
+  },
+  headerFixed: {
+    backgroundColor: APP_COLORS.white,
+    paddingTop: 10,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  headerContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: APP_COLORS.primary,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: 20,
   },
-  container: {
-    flex: 1,
-    padding: 16, // Mengurangi padding agar lebih seimbang
-  },
-  header: {
-    paddingTop: 20,
-    paddingBottom: 30,
-    alignItems: 'center', // Menengahkan header
+  welcomeSection: {
+    padding: 20,
+    paddingTop: 30,
   },
   welcomeText: {
     fontSize: 28,
     fontWeight: 'bold',
     color: APP_COLORS.text,
-    textAlign: 'center', // Menengahkan text
+    textAlign: 'center',
   },
   subText: {
     fontSize: 16,
     color: '#666',
     marginTop: 5,
-    textAlign: 'center', // Menengahkan text
+    textAlign: 'center',
   },
   menuGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 8, // Menambah padding horizontal untuk spacing
-    justifyContent: 'center', // Menengahkan grid
+    paddingHorizontal: 12,
+    justifyContent: 'center',
   },
   menuItem: {
-    width: windowWidth < 380 ? '90%' : '43%', // Menyesuaikan lebar
+    width: windowWidth < 380 ? '90%' : '43%',
     backgroundColor: 'white',
     borderRadius: 15,
     padding: 15,
-    margin: '3%', // Menggunakan margin persentase yang sama
+    margin: '3%',
     alignItems: 'center',
     ...APP_STYLES.card,
   },
@@ -181,9 +221,9 @@ const styles = StyleSheet.create({
   },
   footerContainer: {
     padding: 20,
-    paddingBottom: 25, // Menambah padding bottom
     backgroundColor: APP_COLORS.background,
-    alignItems: 'center', // Menengahkan footer
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5E5',
   },
   logoutButton: {
     flexDirection: 'row',
@@ -194,8 +234,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     borderWidth: 1,
     borderColor: APP_COLORS.error,
-    width: '90%', // Menyesuaikan lebar button
-    maxWidth: 400, // Maksimum lebar
+    width: '100%',
   },
   logoutText: {
     marginLeft: 10,

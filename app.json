@@ -31,6 +31,7 @@
       "bundleIdentifier": "com.cvsuralaya.simpa"
     },
     "android": {
+      "useHermes": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/logosuralaya.png",
         "backgroundColor": "#FFFFFF"

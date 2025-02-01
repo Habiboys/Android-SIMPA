@@ -10,31 +10,32 @@ import {
   Alert,
   ScrollView,
   Keyboard,
+  ActivityIndicator,
+  StatusBar,
+  SafeAreaView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { ENDPOINTS, APP_STYLES, APP_COLORS } from '../config';
-import { AntDesign, Ionicons } from '@expo/vector-icons'; 
+import { AntDesign, Ionicons } from '@expo/vector-icons';
+
+const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight;
 
 export default function LoginScreen({ navigation }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Listen to keyboard events
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
       'keyboardDidShow',
-      () => {
-        setKeyboardVisible(true);
-      }
+      () => setKeyboardVisible(true)
     );
     const keyboardDidHideListener = Keyboard.addListener(
       'keyboardDidHide',
-      () => {
-        setKeyboardVisible(false);
-      }
+      () => setKeyboardVisible(false)
     );
 
     return () => {
@@ -43,101 +44,146 @@ export default function LoginScreen({ navigation }) {
     };
   }, []);
 
-// Di LoginScreen.js
-const handleLogin = async () => {
-  try {
-    const response = await axios.post(ENDPOINTS.LOGIN, { username, password });
-    
-    if (response.data?.success && response.data?.accessToken) {
-      if (response.data.user.role !== 'lapangan') {
-        Alert.alert('Error', 'Anda tidak memiliki akses');
-        return;
-      }
-
-      await AsyncStorage.setItem('accessToken', response.data.accessToken);
-      await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
-      
-      navigation.replace('Home');
+  const handleLogin = async () => {
+    if (!username.trim() || !password.trim()) {
+      Alert.alert('Error', 'Harap isi username dan password');
+      return;
     }
-  } catch (error) {
-    Alert.alert('Error', 'Username atau password salah');
-  }
-};
+
+    if (isLoading) return;
+    setIsLoading(true);
+
+    try {
+      const response = await axios.post(
+        ENDPOINTS.LOGIN, 
+        { username, password },
+        { 
+          timeout: 10000,
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        }
+      );
+      
+      if (response.data?.success && response.data?.accessToken) {
+        if (response.data.user.role !== 'lapangan') {
+          Alert.alert('Error', 'Anda tidak memiliki akses');
+          return;
+        }
+
+        await AsyncStorage.setItem('accessToken', response.data.accessToken);
+        await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
+        navigation.replace('Home');
+      }
+    } catch (error) {
+      let errorMessage = 'Username atau password salah';
+      
+      if (error.code === 'ECONNABORTED') {
+        errorMessage = 'Koneksi timeout. Silakan coba lagi.';
+      } else if (!error.response) {
+        errorMessage = 'Gagal terhubung ke server. Periksa koneksi Anda.';
+      } else if (error.response.status === 429) {
+        errorMessage = 'Terlalu banyak percobaan. Silakan tunggu beberapa saat.';
+      }
+      
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView 
-        contentContainerStyle={styles.scrollContainer}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar 
+        barStyle="dark-content"
+        backgroundColor={APP_COLORS.background}
+        translucent={true}
+      />
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
       >
-        <View style={[
-          styles.logoContainer,
-          keyboardVisible && styles.logoContainerKeyboardVisible
-        ]}>
-          {/* <AntDesign name="API" size={80} color={APP_COLORS.primary} /> */}
-          <Text style={styles.title}>SIMPA</Text>
-          <Text style={styles.subtitle}>Sistem Informasi Manajemen{'\n'}Pemeliharaan AC</Text>
-        </View>
-
-        <View style={styles.formContainer}>
-          <View style={styles.inputContainer}>
-            <AntDesign name="user" size={20} color="#666" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Username"
-              value={username}
-              onChangeText={setUsername}
-              autoCapitalize="none"
-              returnKeyType="next"
-            />
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={[
+            styles.logoContainer,
+            keyboardVisible && styles.logoContainerKeyboardVisible
+          ]}>
+            <Text style={styles.title}>SIMPA</Text>
+            <Text style={styles.subtitle}>Sistem Informasi Manajemen{'\n'}Pemeliharaan AC</Text>
           </View>
-          
-          <View style={styles.inputContainer}>
-            <AntDesign name="lock" size={20} color="#666" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              returnKeyType="done"
-            />
-            <TouchableOpacity 
-              style={styles.passwordToggle}
-              onPress={() => setShowPassword(!showPassword)}
-            >
-              <Ionicons 
-                name={showPassword ? "eye-off" : "eye"} 
-                size={20} 
-                color="#666"
+
+          <View style={styles.formContainer}>
+            <View style={styles.inputContainer}>
+              <AntDesign name="user" size={20} color="#666" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Username"
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+                returnKeyType="next"
               />
+            </View>
+            
+            <View style={styles.inputContainer}>
+              <AntDesign name="lock" size={20} color="#666" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                returnKeyType="done"
+              />
+              <TouchableOpacity 
+                style={styles.passwordToggle}
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <Ionicons 
+                  name={showPassword ? "eye-off" : "eye"} 
+                  size={20} 
+                  color="#666"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity 
+              style={[
+                styles.loginButton,
+                isLoading && styles.loginButtonDisabled
+              ]}
+              onPress={handleLogin}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.loginButtonText}>Masuk</Text>
+              )}
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity 
-            style={styles.loginButton}
-            onPress={handleLogin}
-          >
-            <Text style={styles.loginButtonText}>Masuk</Text>
-          </TouchableOpacity>
-        </View>
-
-        {!keyboardVisible && (
-          <Text style={styles.footer}>CV. Suralaya Teknik © 2025</Text>
-        )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+          {!keyboardVisible && (
+            <Text style={styles.footer}>CV. Suralaya Teknik © 2025</Text>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: APP_COLORS.background,
+    paddingTop: Platform.OS === 'android' ? STATUSBAR_HEIGHT : 0,
+  },
   container: {
-    ...APP_STYLES.container,
-    justifyContent: 'space-between',
+    flex: 1,
   },
   scrollContainer: {
     flexGrow: 1,
@@ -146,11 +192,11 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginTop: 60,
+    marginTop: Platform.OS === 'ios' ? 60 : 40,
   },
   logoContainerKeyboardVisible: {
-    marginTop: -40, // Ubah ini menjadi nilai negatif untuk menggeser logo lebih ke atas
-    transform: [{ scale: 0.8 }], // Mengecilkan ukuran logo saat keyboard muncul
+    marginTop: Platform.OS === 'ios' ? 0 : -20,
+    transform: [{ scale: 0.8 }],
   },
   title: {
     fontSize: 32,
@@ -167,8 +213,8 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     width: '100%',
-    marginTop: -20, // Tambahkan margin negatif untuk menggeser form ke atas
-    paddingBottom: 40, // Tambah padding bottom agar input tidak tertutup keyboard
+    marginTop: -20,
+    paddingBottom: 40,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -193,6 +239,12 @@ const styles = StyleSheet.create({
   loginButton: {
     ...APP_STYLES.button,
     marginTop: 10,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loginButtonDisabled: {
+    opacity: 0.7,
   },
   loginButtonText: {
     ...APP_STYLES.buttonText,

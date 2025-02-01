@@ -15,6 +15,7 @@ import { Linking } from 'react-native';
 import * as ImageManipulator from 'expo-image-manipulator';
 import axiosInstance from '../utils/axios-config';
 import { APP_COLORS, ENDPOINTS } from '../config';
+import  PhotoUploader from '../components/PhotoUploader';
 
 const CustomSelect = ({ value, onValueChange, items = [], placeholder }) => {
   return (
@@ -36,400 +37,7 @@ const CustomSelect = ({ value, onValueChange, items = [], placeholder }) => {
     </View>
   );
 };
-const SinglePhotoPreview = ({ photo, onDelete }) => {
-  if (!photo) return null;
 
-  return (
-    <View style={styles.singlePhotoPreviewItem}>
-      <Image
-        source={{ uri: `data:image/jpeg;base64,${photo}` }}
-        style={styles.photoThumbnail}
-      />
-      {onDelete && (
-        <TouchableOpacity
-          style={styles.deletePhotoButton}
-          onPress={onDelete}
-        >
-          <Text style={styles.deleteButtonText}>×</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-};
-
-
-const SinglePhotoUploader = ({ status, photo, setPhoto }) => {
-  const [hasPermission, setHasPermission] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        // Check existing permissions first
-        let cameraStatus = await ImagePicker.getCameraPermissionsAsync();
-        let mediaStatus = await ImagePicker.getMediaLibraryPermissionsAsync();
-        
-        // Request permissions if not granted
-        if (!cameraStatus.granted) {
-          cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
-        }
-        
-        if (!mediaStatus.granted) {
-          mediaStatus = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        }
-
-        setHasPermission(cameraStatus.granted && mediaStatus.granted);
-        
-        if (!cameraStatus.granted || !mediaStatus.granted) {
-          Alert.alert(
-            'Izin Diperlukan',
-            'Aplikasi membutuhkan izin untuk mengakses kamera dan galeri',
-            [
-              { 
-                text: 'Buka Pengaturan', 
-                onPress: () => Linking.openSettings() 
-              },
-              { 
-                text: 'Batal',
-                style: 'cancel'
-              }
-            ]
-          );
-        }
-      } catch (error) {
-        console.error('Error checking permissions:', error);
-        Alert.alert('Error', 'Gagal memeriksa izin aplikasi');
-      }
-    })();
-  }, []);
-
-  const compressImage = async (base64Image) => {
-    try {
-      const MAX_IMAGE_SIZE = 1024 * 1024; // 1MB
-      if (base64Image.length > MAX_IMAGE_SIZE) {
-        const result = await ImageManipulator.manipulateAsync(
-          `data:image/jpeg;base64,${base64Image}`,
-          [],
-          {
-            compress: 0.5,
-            format: ImageManipulator.SaveFormat.JPEG,
-            base64: true
-          }
-        );
-        return result.base64;
-      }
-      return base64Image;
-    } catch (error) {
-      console.error('Error compressing image:', error);
-      return base64Image;
-    }
-  };
-
-
-  const takePhoto = async () => {
-    try {
-      if (!hasPermission) {
-        Alert.alert('Error', 'Izin kamera diperlukan');
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.7,
-        base64: true,
-        exif: false
-      });
-
-      if (!result.canceled && result.assets?.[0]?.base64) {
-        const compressedBase64 = await compressImage(result.assets[0].base64);
-        setPhoto(compressedBase64);
-      }
-    } catch (error) {
-      console.error('Camera error:', error);
-      Alert.alert(
-        'Error Kamera',
-        'Gagal mengambil foto. Pastikan izin kamera sudah diberikan.',
-        [
-          { text: 'Buka Pengaturan', onPress: () => Linking.openSettings() },
-          { text: 'OK', style: 'cancel' }
-        ]
-      );
-    }
-  };
-
-  const pickFromGallery = async () => {
-    try {
-      if (!hasPermission) {
-        Alert.alert('Error', 'Izin galeri diperlukan');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.7,
-        base64: true,
-        exif: false
-      });
-
-      if (!result.canceled && result.assets?.[0]?.base64) {
-        const compressedBase64 = await compressImage(result.assets[0].base64);
-        setPhoto(compressedBase64);
-      }
-    } catch (error) {
-      console.error('Gallery error:', error);
-      Alert.alert(
-        'Error Galeri',
-        'Gagal memilih foto. Pastikan izin galeri sudah diberikan.',
-        [
-          { text: 'Buka Pengaturan', onPress: () => Linking.openSettings() },
-          { text: 'OK', style: 'cancel' }
-        ]
-      );
-    }
-  };
-
-  const showImageSourceOptions = () => {
-    Alert.alert(
-      'Pilih Sumber Foto',
-      'Pilih foto dari:',
-      [
-        { text: 'Kamera', onPress: takePhoto },
-        { text: 'Galeri', onPress: pickFromGallery },
-        { text: 'Batal', style: 'cancel' }
-      ],
-      { cancelable: true }
-    );
-  };
-
-  return (
-    <View style={styles.photoUploaderContainer}>
-      <TouchableOpacity onPress={showImageSourceOptions} style={styles.pickImageButton}>
-        <Text style={styles.pickImageButtonText}>
-          {photo ? 'Ganti Foto' : 'Tambah Foto'}
-        </Text>
-      </TouchableOpacity>
-      <SinglePhotoPreview
-        photo={photo}
-        onDelete={() => setPhoto(null)}
-      />
-    </View>
-  );
-};
-
-
-
-const PhotoPreview = ({ photos, setPhotos, status }) => {
-  return (
-    <View style={styles.photoPreviewContainer}>
-      {photos
-        .filter(p => p.status === status)
-        .map((photo, index) => (
-          <View key={index} style={styles.photoPreviewItem}>
-            <Image
-              source={{ uri: `data:image/jpeg;base64,${photo.foto}` }}
-              style={styles.photoThumbnail}
-            />
-            {/* Pastikan teks dibungkus dengan <Text> */}
-            <Text style={styles.photoName}>{photo.nama}</Text>
-            <TouchableOpacity
-              style={styles.deletePhotoButton}
-              onPress={() => {
-                setPhotos(prev => prev.filter((p, i) => 
-                  !(p.status === status && i === index)
-                ));
-              }}
-            >
-              <Text style={styles.deleteButtonText}>×</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-    </View>
-  );
-};
-
-const PhotoUploader = ({ status, photos, setPhotos }) => {
-  const [hasPermission, setHasPermission] = useState(false);
-  const [photoName, setPhotoName] = useState(''); // State untuk menyimpan nama foto
-
-  useEffect(() => {
-    (async () => {
-      try {
-        // Check existing permissions first
-        let cameraStatus = await ImagePicker.getCameraPermissionsAsync();
-        let mediaStatus = await ImagePicker.getMediaLibraryPermissionsAsync();
-        
-        // Request permissions if not granted
-        if (!cameraStatus.granted) {
-          cameraStatus = await ImagePicker.requestCameraPermissionsAsync();
-        }
-        
-        if (!mediaStatus.granted) {
-          mediaStatus = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        }
-
-        setHasPermission(cameraStatus.granted && mediaStatus.granted);
-        
-        if (!cameraStatus.granted || !mediaStatus.granted) {
-          Alert.alert(
-            'Izin Diperlukan',
-            'Aplikasi membutuhkan izin untuk mengakses kamera dan galeri',
-            [
-              { 
-                text: 'Buka Pengaturan', 
-                onPress: () => Linking.openSettings() 
-              },
-              { 
-                text: 'Batal',
-                style: 'cancel'
-              }
-            ]
-          );
-        }
-      } catch (error) {
-        console.error('Error checking permissions:', error);
-        Alert.alert('Error', 'Gagal memeriksa izin aplikasi');
-      }
-    })();
-  }, []);
-
-  const compressImage = async (base64Image) => {
-    try {
-      const MAX_IMAGE_SIZE = 1024 * 1024; // 1MB
-      if (base64Image.length > MAX_IMAGE_SIZE) {
-        const result = await ImageManipulator.manipulateAsync(
-          `data:image/jpeg;base64,${base64Image}`,
-          [],
-          {
-            compress: 0.5,
-            format: ImageManipulator.SaveFormat.JPEG,
-            base64: true
-          }
-        );
-        return result.base64;
-      }
-      return base64Image;
-    } catch (error) {
-      console.error('Error compressing image:', error);
-      return base64Image;
-    }
-  };
-
-  const handleAddPhoto = async (base64Photo) => {
-    if (!photoName) {
-      Alert.alert('Error', 'Nama foto harus diisi');
-      return;
-    }
-
-    const compressedBase64 = await compressImage(base64Photo);
-    setPhotos(prev => [...prev, {
-      foto: compressedBase64,
-      status: status,
-      nama: photoName, // Sertakan nama foto
-    }]);
-    setPhotoName(''); // Reset input nama foto setelah foto ditambahkan
-  };
-
-  const takePhoto = async () => {
-    try {
-      if (!hasPermission) {
-        Alert.alert('Error', 'Izin kamera diperlukan');
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.7,
-        base64: true,
-        exif: false
-      });
-
-      if (!result.canceled && result.assets?.[0]?.base64) {
-        await handleAddPhoto(result.assets[0].base64);
-      }
-    } catch (error) {
-      console.error('Camera error:', error);
-      Alert.alert(
-        'Error Kamera',
-        'Gagal mengambil foto. Pastikan izin kamera sudah diberikan.',
-        [
-          { text: 'Buka Pengaturan', onPress: () => Linking.openSettings() },
-          { text: 'OK', style: 'cancel' }
-        ]
-      );
-    }
-  };
-
-  const pickFromGallery = async () => {
-    try {
-      if (!hasPermission) {
-        Alert.alert('Error', 'Izin galeri diperlukan');
-        return;
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.7,
-        base64: true,
-        exif: false
-      });
-
-      if (!result.canceled && result.assets?.[0]?.base64) {
-        await handleAddPhoto(result.assets[0].base64);
-      }
-    } catch (error) {
-      console.error('Gallery error:', error);
-      Alert.alert(
-        'Error Galeri',
-        'Gagal memilih foto. Pastikan izin galeri sudah diberikan.',
-        [
-          { text: 'Buka Pengaturan', onPress: () => Linking.openSettings() },
-          { text: 'OK', style: 'cancel' }
-        ]
-      );
-    }
-  };
-
-  const showImageSourceOptions = () => {
-    Alert.alert(
-      'Pilih Sumber Foto',
-      'Pilih foto dari:',
-      [
-        {
-          text: 'Kamera',
-          onPress: takePhoto
-        },
-        {
-          text: 'Galeri',
-          onPress: pickFromGallery
-        },
-        {
-          text: 'Batal',
-          style: 'cancel'
-        }
-      ],
-      { cancelable: true }
-    );
-  };
-
-  return (
-    <View style={styles.photoUploaderContainer}>
-      {/* Input Nama Foto */}
-      <TextInput
-        style={styles.photoNameInput}
-        placeholder="Masukkan nama foto"
-        value={photoName}
-        onChangeText={setPhotoName}
-      />
-
-      {/* Tombol Unggah Foto */}
-      <TouchableOpacity onPress={showImageSourceOptions} style={styles.pickImageButton}>
-        <Text style={styles.pickImageButtonText}>Tambah Foto</Text>
-      </TouchableOpacity>
-
-      {/* Preview Foto */}
-      <PhotoPreview photos={photos} setPhotos={setPhotos} status={status} />
-    </View>
-  );
-};
 
 const FormScreen = ({ navigation }) => {
   const [proyek, setProyek] = useState(null);
@@ -614,8 +222,6 @@ if (isOutdoor && !paletOutdoorPhoto) {
       ]);
     } catch (error) {
       Alert.alert('Error', 'Gagal menyimpan data');
-      console.error('Full Error:', error.response);
-    Alert.alert('Error', error.response?.data?.message || 'Gagal menyimpan data');
     } finally {
       setLoading(false);
     }
@@ -630,8 +236,23 @@ if (isOutdoor && !paletOutdoorPhoto) {
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+     <View style={styles.container}>
+      {/* Header Section */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Text style={styles.backButtonText}>‹</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Form Pemeriksaan AC</Text>
+      </View>
+
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Location Selection */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Pilih Lokasi</Text>
@@ -790,11 +411,11 @@ if (isOutdoor && !paletOutdoorPhoto) {
       <Text style={styles.photoDescription}>
         Upload foto palet unit indoor untuk dokumentasi pemeliharaan.
       </Text>
-      <SinglePhotoUploader 
-        status="palet_indoor"
-        photo={paletIndoorPhoto}
-        setPhoto={setPaletIndoorPhoto}
-      />
+    <PhotoUploader
+  mode="single"
+  photo={paletIndoorPhoto}
+  setPhoto={setPaletIndoorPhoto}
+/>
     </View>
   )}
 
@@ -805,11 +426,11 @@ if (isOutdoor && !paletOutdoorPhoto) {
       <Text style={styles.photoDescription}>
         Upload foto palet unit outdoor untuk dokumentasi pemeliharaan.
       </Text>
-      <SinglePhotoUploader 
-        status="palet_outdoor"
-        photo={paletOutdoorPhoto}
-        setPhoto={setPaletOutdoorPhoto}
-      />
+  <PhotoUploader
+  mode="single"
+  photo={paletOutdoorPhoto}
+  setPhoto={setPaletOutdoorPhoto}
+/>
     </View>
   )}
 </View>
@@ -826,10 +447,11 @@ if (isOutdoor && !paletOutdoorPhoto) {
     <View style={styles.photoContainer}>
       <Text style={styles.photoLabel}>Foto Sebelum Pemeliharaan</Text>
       {/* <Text style={styles.sublabel}>Dokumentasikan kondisi sebelum pembersihan atau perbaikan.</Text> */}
-      <PhotoUploader 
-        status="sebelum"
-        photos={photos}
-        setPhotos={setPhotos}
+     <PhotoUploader
+        mode="multiple" // Mode untuk unggah banyak foto
+        photos={photos} // State untuk menyimpan daftar foto
+        setPhotos={setPhotos} // Fungsi untuk memperbarui state foto
+        status="sebelum" // Status untuk mengelompokkan foto
       />
     </View>
 
@@ -840,10 +462,11 @@ if (isOutdoor && !paletOutdoorPhoto) {
     <View style={styles.photoContainer}>
       <Text style={styles.photoLabel}>Foto Sesudah Pemeliharaan</Text>
       {/* <Text style={styles.sublabel}>Unggah foto setelah proses pembersihan atau perbaikan selesai.</Text> */}
-      <PhotoUploader 
-        status="sesudah"
+      <PhotoUploader
+        mode="multiple"
         photos={photos}
         setPhotos={setPhotos}
+        status="sesudah"
       />
     </View>
   </View>
@@ -864,13 +487,40 @@ if (isOutdoor && !paletOutdoorPhoto) {
 };
 
 const styles = StyleSheet.create({
-  container: {
+   container: {
     flex: 1,
     backgroundColor: APP_COLORS.background,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    paddingHorizontal: 15,
+    paddingTop: 40, // Safe area for notch
+    height: 100, // Total header height
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    elevation: 2,
+  },
+  backButton: {
+    marginRight: 15,
+  },
+  backButtonText: {
+    fontSize: 32,
+    color: APP_COLORS.primary,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: APP_COLORS.text,
+  },
   scrollView: {
     flex: 1,
+  },
+  scrollContent: {
     padding: 20,
+    paddingTop: 15, // Reduced top padding since header is separate
+    paddingBottom: 100, // Space for footer
   },
   section: {
     backgroundColor: 'white',
@@ -1044,11 +694,6 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#ddd',
     marginVertical: 15,
-  },
-  singlePhotoPreviewItem: {
-    width: '100%',
-    position: 'relative',
-    marginTop: 10,
   },
    photoName: {
     fontSize: 12,

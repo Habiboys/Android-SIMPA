@@ -1,5 +1,5 @@
-// export const API_URL = "https://backend-593079612074.asia-southeast1.run.app"; // Ganti dengan IP komputer Anda
-export const API_URL = "http://192.168.1.43:3000"; // Ganti dengan IP komputer Anda
+export const API_URL = "https://backend-593079612074.asia-southeast1.run.app"; // Ganti dengan IP komputer Anda
+// export const API_URL = "http://192.168.1.43:3000"; // Ganti dengan IP komputer Anda
 
 export const ENDPOINTS = {
   LOGIN: `${API_URL}/auth/login`,
