@@ -39,8 +39,8 @@ export default function LoginScreen({ navigation }) {
     );
 
     return () => {
-      keyboardDidHideListener.remove();
       keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
     };
   }, []);
 
@@ -49,22 +49,21 @@ export default function LoginScreen({ navigation }) {
       Alert.alert('Error', 'Harap isi username dan password');
       return;
     }
-
     if (isLoading) return;
     setIsLoading(true);
 
     try {
       const response = await axios.post(
-        ENDPOINTS.LOGIN, 
+        ENDPOINTS.LOGIN,
         { username, password },
-        { 
+        {
           timeout: 10000,
           headers: {
             'Content-Type': 'application/json',
-          }
+          },
         }
       );
-      
+
       if (response.data?.success && response.data?.accessToken) {
         if (response.data.user.role !== 'lapangan') {
           Alert.alert('Error', 'Anda tidak memiliki akses');
@@ -72,12 +71,13 @@ export default function LoginScreen({ navigation }) {
         }
 
         await AsyncStorage.setItem('accessToken', response.data.accessToken);
+        await AsyncStorage.setItem('refreshToken', response.data.refreshToken);
         await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
         navigation.replace('Home');
       }
     } catch (error) {
       let errorMessage = 'Username atau password salah';
-      
+
       if (error.code === 'ECONNABORTED') {
         errorMessage = 'Koneksi timeout. Silakan coba lagi.';
       } else if (!error.response) {
@@ -85,7 +85,7 @@ export default function LoginScreen({ navigation }) {
       } else if (error.response.status === 429) {
         errorMessage = 'Terlalu banyak percobaan. Silakan tunggu beberapa saat.';
       }
-      
+
       Alert.alert('Error', errorMessage);
     } finally {
       setIsLoading(false);
@@ -94,27 +94,29 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar 
+      <StatusBar
         barStyle="dark-content"
         backgroundColor={APP_COLORS.background}
         translucent={true}
       />
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0} // Tambahkan offset
       >
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContainer}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={[
-            styles.logoContainer,
-            keyboardVisible && styles.logoContainerKeyboardVisible
-          ]}>
+          {/* Logo Section */}
+          <View style={[styles.logoContainer, keyboardVisible && styles.logoContainerKeyboardVisible]}>
             <Text style={styles.title}>SIMPA</Text>
-            <Text style={styles.subtitle}>Sistem Informasi Manajemen{'\n'}Pemeliharaan AC</Text>
+            <Text style={styles.subtitle}>
+              Sistem Informasi Manajemen{'\n'}Pemeliharaan AC
+            </Text>
           </View>
 
+          {/* Form Section */}
           <View style={styles.formContainer}>
             <View style={styles.inputContainer}>
               <AntDesign name="user" size={20} color="#666" style={styles.inputIcon} />
@@ -127,7 +129,7 @@ export default function LoginScreen({ navigation }) {
                 returnKeyType="next"
               />
             </View>
-            
+
             <View style={styles.inputContainer}>
               <AntDesign name="lock" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
@@ -139,23 +141,21 @@ export default function LoginScreen({ navigation }) {
                 autoCapitalize="none"
                 returnKeyType="done"
               />
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.passwordToggle}
                 onPress={() => setShowPassword(!showPassword)}
               >
-                <Ionicons 
-                  name={showPassword ? "eye-off" : "eye"} 
-                  size={20} 
+                <Ionicons
+                  name={showPassword ? "eye-off" : "eye"}
+                  size={20}
                   color="#666"
                 />
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity 
-              style={[
-                styles.loginButton,
-                isLoading && styles.loginButtonDisabled
-              ]}
+            {/* Login Button */}
+            <TouchableOpacity
+              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
               onPress={handleLogin}
               disabled={isLoading}
             >
@@ -167,6 +167,7 @@ export default function LoginScreen({ navigation }) {
             </TouchableOpacity>
           </View>
 
+          {/* Footer */}
           {!keyboardVisible && (
             <Text style={styles.footer}>CV. Suralaya Teknik © 2025</Text>
           )}
@@ -196,7 +197,7 @@ const styles = StyleSheet.create({
   },
   logoContainerKeyboardVisible: {
     marginTop: Platform.OS === 'ios' ? 0 : -20,
-    transform: [{ scale: 0.8 }],
+    // Hapus transformasi skala jika tidak diperlukan
   },
   title: {
     fontSize: 32,

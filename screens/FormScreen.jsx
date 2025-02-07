@@ -10,9 +10,9 @@ import {
   TextInput,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import * as ImagePicker from 'expo-image-picker';
+// import * as ImagePicker from 'expo-image-picker';
 import { Linking } from 'react-native';
-import * as ImageManipulator from 'expo-image-manipulator';
+// import * as ImageManipulator from 'expo-image-manipulator';
 import axiosInstance from '../utils/axios-config';
 import { APP_COLORS, ENDPOINTS } from '../config';
 import  PhotoUploader from '../components/PhotoUploader';
@@ -200,10 +200,10 @@ if (isOutdoor && !paletOutdoorPhoto) {
   foto: photos.map(p => ({
     foto: p.foto,
     status: p.status,
-    nama: p.nama // Pastikan nama foto disertakan
+    nama: p.nama 
   })),
-  palet_indoor: isIndoor ? paletIndoorPhoto : null, // Hanya kirim jika indoor
-  palet_outdoor: isOutdoor ? paletOutdoorPhoto : null // Hanya kirim jika outdoor
+  palet_indoor: isIndoor ? paletIndoorPhoto : null, 
+  palet_outdoor: isOutdoor ? paletOutdoorPhoto : null 
 };
 
       setLoading(true);
@@ -496,8 +496,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'white',
     paddingHorizontal: 15,
-    paddingTop: 40, // Safe area for notch
-    height: 100, // Total header height
+    paddingTop: 30, 
+    height: 100, 
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
     elevation: 2,
@@ -519,8 +519,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingTop: 15, // Reduced top padding since header is separate
-    paddingBottom: 100, // Space for footer
+    paddingTop: 15, 
+    paddingBottom: 100, 
   },
   section: {
     backgroundColor: 'white',

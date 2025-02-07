@@ -39,7 +39,12 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
+        // const refreshToken = await AsyncStorage.getItem('refreshToken');
         const refreshToken = await AsyncStorage.getItem('refreshToken');
+if (!refreshToken) {
+  console.error('Refresh token not found in storage');
+  return Promise.reject(new Error('Refresh token not found'));
+}
         const response = await axios.post(`${API_URL}/auth/refresh`, {
           refreshToken: refreshToken
         });

@@ -11,11 +11,9 @@ import { APP_COLORS, APP_STYLES } from '../config';
 import { AntDesign } from '@expo/vector-icons';
 
 const LoadingScreen = () => {
-  // Membuat animasi untuk logo
   const fadeAnim = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
-    // Membuat animasi berulang untuk efek pulsing
     Animated.loop(
       Animated.sequence([
         Animated.timing(fadeAnim, {

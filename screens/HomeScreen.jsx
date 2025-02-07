@@ -55,7 +55,7 @@ export default function HomeScreen({ navigation }) {
       title: 'Riwayat Pemeriksaan',
       icon: 'profile',
       color: APP_COLORS.secondary,
-      onPress: () => Alert.alert('Info', 'Fitur akan segera hadir')
+      onPress: () => navigation.navigate('History')
     },
     {
       title: 'Jadwal Maintenance',
