@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState, useEffect } from 'react';
+import axiosInstance from './utils/axios-config';
 
 import LoginScreen from './screens/LoginScreen';
 import HomeScreen from './screens/HomeScreen';
@@ -20,6 +21,7 @@ useEffect(() => {
   (async () => {
     try {
       const accessToken = await AsyncStorage.getItem('accessToken');
+
       if (accessToken) {
         // Coba validasi accessToken menggunakan endpoint /auth/validate
         try {

@@ -30,11 +30,11 @@ export default function LoginScreen({ navigation }) {
 
   useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
-      'keyboardDidShow',
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
       () => setKeyboardVisible(true)
     );
     const keyboardDidHideListener = Keyboard.addListener(
-      'keyboardDidHide',
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
       () => setKeyboardVisible(false)
     );
 
@@ -43,7 +43,6 @@ export default function LoginScreen({ navigation }) {
       keyboardDidHideListener.remove();
     };
   }, []);
-
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
       Alert.alert('Error', 'Harap isi username dan password');
@@ -73,6 +72,8 @@ export default function LoginScreen({ navigation }) {
         await AsyncStorage.setItem('accessToken', response.data.accessToken);
         await AsyncStorage.setItem('refreshToken', response.data.refreshToken);
         await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
+        console.log(await AsyncStorage.getItem('accessToken'));
+console.log(await AsyncStorage.getItem('refreshToken'));
         navigation.replace('Home');
       }
     } catch (error) {
@@ -100,23 +101,28 @@ export default function LoginScreen({ navigation }) {
         translucent={true}
       />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.container}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0} // Tambahkan offset
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContainer}
+          contentContainerStyle={[
+            styles.scrollContainer,
+            keyboardVisible && styles.scrollContainerKeyboardVisible
+          ]}
           keyboardShouldPersistTaps="handled"
+          bounces={false}
         >
-          {/* Logo Section */}
-          <View style={[styles.logoContainer, keyboardVisible && styles.logoContainerKeyboardVisible]}>
+          <View style={[
+            styles.logoContainer,
+            keyboardVisible && styles.logoContainerKeyboardVisible
+          ]}>
             <Text style={styles.title}>SIMPA</Text>
             <Text style={styles.subtitle}>
               Sistem Informasi Manajemen{'\n'}Pemeliharaan AC
             </Text>
           </View>
 
-          {/* Form Section */}
           <View style={styles.formContainer}>
             <View style={styles.inputContainer}>
               <AntDesign name="user" size={20} color="#666" style={styles.inputIcon} />
@@ -153,7 +159,6 @@ export default function LoginScreen({ navigation }) {
               </TouchableOpacity>
             </View>
 
-            {/* Login Button */}
             <TouchableOpacity
               style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
               onPress={handleLogin}
@@ -167,9 +172,10 @@ export default function LoginScreen({ navigation }) {
             </TouchableOpacity>
           </View>
 
-          {/* Footer */}
           {!keyboardVisible && (
-            <Text style={styles.footer}>CV. Suralaya Teknik © 2025</Text>
+            <View style={styles.footerContainer}>
+              <Text style={styles.footer}>CV. Suralaya Teknik © 2025</Text>
+            </View>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -190,32 +196,33 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'space-between',
     padding: 20,
+    minHeight: '100%',
+  },
+  scrollContainerKeyboardVisible: {
+    justifyContent: 'flex-start',
   },
   logoContainer: {
     alignItems: 'center',
     marginTop: Platform.OS === 'ios' ? 60 : 40,
+    marginBottom: 40,
   },
   logoContainerKeyboardVisible: {
-    marginTop: Platform.OS === 'ios' ? 0 : -20,
-    // Hapus transformasi skala jika tidak diperlukan
+    marginTop: Platform.OS === 'ios' ? 20 : 20,
+    marginBottom: 20,
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
     color: APP_COLORS.primary,
-    marginTop: 20,
     marginBottom: 10,
   },
   subtitle: {
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 40,
   },
   formContainer: {
     width: '100%',
-    marginTop: -20,
-    paddingBottom: 40,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -250,9 +257,11 @@ const styles = StyleSheet.create({
   loginButtonText: {
     ...APP_STYLES.buttonText,
   },
+  footerContainer: {
+    marginTop: 20,
+  },
   footer: {
     textAlign: 'center',
     color: '#666',
-    marginBottom: 20,
   },
 });
