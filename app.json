@@ -13,7 +13,7 @@
     },
     "plugins": [
       [
-       "expo-image-picker",
+        "expo-image-picker",
         {
           "photosPermission": "The app needs access to your photos.",
           "cameraPermission": "The app needs access to your camera."
@@ -28,7 +28,10 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cvsuralaya.simpa"
+      "bundleIdentifier": "com.cvsuralaya.simpa",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "useHermes": true,
@@ -38,11 +41,12 @@
       },
       "package": "com.cvsuralaya.simpa",
       "permissions": [
-    "android.permission.CAMERA",
-    "android.permission.READ_EXTERNAL_STORAGE",
-    "android.permission.WRITE_EXTERNAL_STORAGE",
-    "android.permission.MEDIA_LIBRARY"
-  ]
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.MEDIA_LIBRARY",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "extra": {
       "eas": {

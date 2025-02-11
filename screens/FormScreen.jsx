@@ -8,6 +8,9 @@ import {
   Alert,
   Image,
   TextInput,
+  ActivityIndicator,
+  Dimensions,
+  Modal, // 
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 // import * as ImagePicker from 'expo-image-picker';
@@ -158,59 +161,56 @@ const isOutdoor = selectedUnit?.detailModel.kategori === 'outdoor';
   };
 
   const handleSubmit = async () => {
-    try {
-      if (!unit || hasilPemeriksaan.length === 0 || photos.length < 2) {
-        Alert.alert('Error', 'Semua data harus diisi lengkap');
-        return;
-      }
+  try {
+    setLoading(true); // Aktifkan loading
+    if (!unit || hasilPemeriksaan.length === 0 || photos.length < 2) {
+      Alert.alert('Error', 'Semua data harus diisi lengkap');
+      return;
+    }
+    if (hasilPemeriksaan.some(hp => !hp.nilai)) {
+      Alert.alert('Error', 'Semua hasil pemeriksaan harus diisi');
+      return;
+    }
+    if (hasilPembersihan.some(hp => !hp.sebelum || !hp.sesudah)) {
+      Alert.alert('Error', 'Semua hasil pembersihan harus diisi');
+      return;
+    }
+    if (isIndoor && !paletIndoorPhoto) {
+      Alert.alert('Error', 'Foto palet indoor harus diisi');
+      return;
+    }
+    if (isOutdoor && !paletOutdoorPhoto) {
+      Alert.alert('Error', 'Foto palet outdoor harus diisi');
+      return;
+    }
 
-      if (hasilPemeriksaan.some(hp => !hp.nilai)) {
-        Alert.alert('Error', 'Semua hasil pemeriksaan harus diisi');
-        return;
-      }
+    const payload = {
+      id_unit: parseInt(unit),
+      tanggal: new Date().toISOString().split('T')[0],
+      nama_pemeriksaan: 'Pemeriksaan Rutin',
+      kategori: selectedUnit?.detailModel.kategori,
+      hasil_pemeriksaan: hasilPemeriksaan,
+      hasil_pembersihan: hasilPembersihan.map(hp => ({
+        ...hp,
+        sebelum: parseFloat(hp.sebelum),
+        sesudah: parseFloat(hp.sesudah)
+      })),
+      foto: photos.map(p => ({
+        foto: p.foto,
+        status: p.status,
+        nama: p.nama
+      })),
+      palet_indoor: isIndoor ? paletIndoorPhoto : null,
+      palet_outdoor: isOutdoor ? paletOutdoorPhoto : null
+    };
 
-      if (hasilPembersihan.some(hp => !hp.sebelum || !hp.sesudah)) {
-        Alert.alert('Error', 'Semua hasil pembersihan harus diisi');
-        return;
-      }
-     if (isIndoor && !paletIndoorPhoto) {
-  Alert.alert('Error', 'Foto palet indoor harus diisi');
-  return;
-}
+    setLoading(true);
+    const response = await axiosInstance.post(ENDPOINTS.MAINTENANCE, payload);
 
-if (isOutdoor && !paletOutdoorPhoto) {
-  Alert.alert('Error', 'Foto palet outdoor harus diisi');
-  return;
-}
-
-      // const selectedUnit = unitList.find(u => u.id === parseInt(unit));
-     
-      
-      const payload = {
-  id_unit: parseInt(unit),
-  tanggal: new Date().toISOString().split('T')[0],
-  nama_pemeriksaan: 'Pemeriksaan Rutin',
-  kategori: selectedUnit?.detailModel.kategori,
-  hasil_pemeriksaan: hasilPemeriksaan,
-  hasil_pembersihan: hasilPembersihan.map(hp => ({
-    ...hp,
-    sebelum: parseFloat(hp.sebelum),
-    sesudah: parseFloat(hp.sesudah)
-  })),
-  foto: photos.map(p => ({
-    foto: p.foto,
-    status: p.status,
-    nama: p.nama 
-  })),
-  palet_indoor: isIndoor ? paletIndoorPhoto : null, 
-  palet_outdoor: isOutdoor ? paletOutdoorPhoto : null 
-};
-
-      setLoading(true);
-      await axiosInstance.post(ENDPOINTS.MAINTENANCE, payload);
-      
+    // Pastikan backend mengembalikan respons sukses
+    if (response.data.message === 'Maintenance data created successfully') {
       Alert.alert('Sukses', 'Data berhasil disimpan', [
-        { 
+        {
           text: 'OK',
           onPress: () => {
             resetForm();
@@ -220,20 +220,34 @@ if (isOutdoor && !paletOutdoorPhoto) {
           }
         }
       ]);
-    } catch (error) {
-      Alert.alert('Error', 'Gagal menyimpan data');
-    } finally {
-      setLoading(false);
+    } else {
+      throw new Error('Respons tidak valid dari server');
     }
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
-    );
+  } catch (error) {
+    console.error('Error:', error);
+    Alert.alert('Error', error.message || 'Gagal menyimpan data');
+  } finally {
+    setLoading(false);
   }
+};
+const LoadingOverlay = ({ visible }) => {
+  return (
+    <Modal
+      transparent={true}
+      animationType="fade"
+      visible={visible}
+      onRequestClose={() => {}}
+    >
+      <View style={styles.loadingOverlay}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={APP_COLORS.primary} />
+          <Text style={styles.loadingText}>Mohon tunggu...</Text>
+          <Text style={styles.loadingSubText}>Sedang memproses data</Text>
+        </View>
+      </View>
+    </Modal>
+  );
+};
 
   return (
      <View style={styles.container}>
@@ -481,7 +495,10 @@ if (isOutdoor && !paletOutdoorPhoto) {
         >
           <Text style={styles.submitButtonText}>Kirim Hasil Pemeriksaan</Text>
         </TouchableOpacity>
+
       </View>
+      {/* Loading Overlay */}
+    <LoadingOverlay visible={loading} />
     </View>
   );
 };
@@ -708,6 +725,49 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     padding: 8,
     marginBottom: 10,
+  },
+ // Updated loading styles using Dimensions.get inside the styles
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height,
+  },
+  loadingContainer: {
+    backgroundColor: 'white',
+    padding: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    minWidth: Dimensions.get('window').width * 0.8,
+    minHeight: Dimensions.get('window').height * 0.2,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: APP_COLORS.text,
+    textAlign: 'center',
+  },
+  loadingSubText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
 });
 
